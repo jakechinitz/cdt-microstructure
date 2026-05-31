@@ -47,17 +47,35 @@ interpret d_H.
    dual graphs (see `VERTEX_PROVENANCE.md` §5 / `ds_crosscheck.py` header).
    Used only to confirm direction-of-motion agrees with d_H/blob; never a verdict.
 
-## Pre-registered interpretation (success = FLAT OR BETTER)
+## AMENDMENT (post-diagnostic, pre-results): a flat d_H is WEAK evidence
+
+Before any sweep numbers, the term-teeth diagnostic was extended (see
+`eprl_term_diagnostic.py`) and found: the centered EPRL variance is real
+(σ≈0.87) but **largely orthogonal to the geometry** — type-split 0.054
+(split/σ≈0.06) and dual-graph nearest-neighbour correlation r_nn≈+0.14 (weak,
+~4σ). This was verified NOT to be a centering artifact (raw and centered
+type-splits identical to 4e-15). Consequence: **a flat d_H across β is now
+expected almost regardless of the theory**, so flat d_H carries little
+information and must NOT be banked as "theory tolerates 4D." Two corrections:
+- The decisive observable is the **cos³ BLOB / profile**, not d_H — does the
+  weak-but-real geometric channel move the de Sitter shape as β→0.3?
+- d_s is NOT a usable arbiter: a measured β=0 d_s(σ) flow peaks at ~2.4 on a
+  known-good bare config (the documented CDT-dual-graph under-read), so d_s would
+  falsely condemn the substrate. Do not gate on d_s.
+
+## Pre-registered interpretation (success = FLAT OR BETTER, read via BLOB)
 
 The premise: the EPRL amplitude should be **compatible with, or support**,
-physical 4D de Sitter geometry. So at matched volume, thermalized, with the
-control passing (G4), as β increases:
+physical 4D de Sitter geometry. At matched volume, thermalized, control passing
+(G4), as β increases — judged PRIMARILY on the cos³ blob/profile, with d_H
+secondary and read in light of the weak-coupling amendment above:
 
 | Outcome across β | Reading |
 |---|---|
-| d_H / blob **hold near bare** (d_H≈3.37, blob persists) | **SUCCESS — theory survives.** Amplitude is compatible with 4D; coupling it on does not destroy the de Sitter geometry. (The expected, hoped-for result.) |
-| d_H / blob **climb** (d_H↑ toward 4, blob sharpens) | **STRONG SUCCESS.** Amplitude actively supports 4D. Would be a surprise at frozen-j. |
-| d_H / blob **degrade** (d_H↓ toward ~2, blob dissolves), monotonic in β | **CONCERNING — amplitude fights 4D.** Investigate; do NOT pre-excuse it. |
+| **blob persists** (and d_H holds ~3.37) | **SURVIVAL, weakly informative.** Consistent with "amplitude doesn't destroy 4D," BUT given the measured orthogonality this is close to the expected-anyway outcome; state it as a decoupling result, not a tolerance proof. |
+| blob **sharpens** / d_H climbs | **STRONG SUCCESS.** The geometric channel actively supports 4D — would be notable given how weak the coupling is. |
+| blob **dissolves** / d_H↓ toward ~2, monotonic in β | **CONCERNING — amplitude fights 4D.** Investigate; do NOT pre-excuse. |
+| nothing moves at all, even β=0.3 | **DECOUPLING NULL (the likely result).** "Frozen-j=3 EPRL intertwiner fluctuations are orthogonal to the de Sitter geometry; spin labels and macroscopic shape decouple in this discretization." A real, publishable null — a statement about variable choice + frozen-j, not about QG endorsing de Sitter. |
 
 ### Strength of claim — bounded honestly
 

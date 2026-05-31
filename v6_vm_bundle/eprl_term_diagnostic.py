@@ -4,21 +4,37 @@ it have TEETH?
 
 The matched-volume beta sweep can only be interpreted if the centered EPRL term
 actually carries variance across configurations. If the centered
-per-pentachoron log-amplitude is a near-delta spike, the term is inert: every
-"flat d_H vs beta" result afterward is an artifact of a dead term, not evidence
-the theory tolerates 4D. If it has real spread, a flat result is a genuine
-finding ("the term fluctuates but does not steer dimension").
+per-pentachoron log-amplitude is a near-delta spike, the term is inert.
+
+>>> CORRECTION (do not over-read "HAS TEETH") <<<
+Spread alone (sigma>0) is NOT sufficient to make a flat sweep interpretable. What
+matters is whether the variance couples to the GEOMETRIC degrees of freedom (the
+(4,1)/(3,2) simplex-type structure) that d_H and the volume profile are built
+from. Measured on vertex_j3.npz:
+    sigma (per-pent centered)         = 0.87   (real spread)
+    type-split |<41> - <32>|          = 0.054  (16x SMALLER than sigma)
+    dual-graph nearest-nbr corr r_nn  = +0.14  (weak, ~4 sigma vs shuffled null)
+So the variance is LARGELY (not perfectly) orthogonal to geometry. Consequence:
+a FLAT d_H sweep is WEAK evidence -- flat is the expected outcome almost
+regardless of beta when the coupling rides mostly along label directions d_H
+cannot see. Do NOT bank a flat sweep as "theory tolerates 4D"; that is hard to
+distinguish from "the term cannot move d_H." The informative question is whether
+the weak-but-real geometric channel moves the cos^3 BLOB (not just d_H) as beta
+rises to 0.3.
+
+Verified: this type-blindness is NOT an artifact of centering -- subtracting a
+global scalar mu cannot change a difference of means; raw and centered
+type-splits are identical to 4e-15. The orthogonality is a property of the
+frozen-j=3 amplitude itself.
 
 This is a ZERO-SWEEP test: it builds one thermalized-label config and histograms
   centered_p = -log|A_v(faces of p)| - mu ,   mu = mean over pentachora.
 
 Reported:
-  * sigma = std of centered contributions (inert if <0.05, has-teeth if >0.5)
+  * sigma = std of centered contributions
   * the effective per-move action scale beta*sigma at the swept betas
-  * whether the variance aligns with the (4,1)/(3,2) simplex-type split -- the
-    geometric DOF that actually controls the volume profile / d_H. Variance that
-    is large but type-blind means the term has teeth largely ORTHOGONAL to the
-    geometry, which is itself the correct reading of a flat sweep.
+  * the (4,1)/(3,2) type-split -- if << sigma, the teeth are largely orthogonal
+    to the geometry d_H measures, so a flat sweep is weak (not strong) evidence.
 
 Usage:
   python eprl_term_diagnostic.py [--K 16 --grow 8000 --hb 15 --seed 0]
@@ -85,15 +101,39 @@ def main():
     print(f"  (uniform-random labels sigma = {(raw_u-raw_u.mean()).std():.4f}  "
           f"-> heat-bath narrows the distribution)")
 
+    # raw (uncentered) type-split too: proves centering does not create blindness
+    raw41, raw32 = raw[typ == "41"], raw[typ == "32"]
     m41, m32 = cen[typ == "41"], cen[typ == "32"]
     if len(m41) and len(m32):
-        split = abs(m41.mean() - m32.mean())
+        split_cen = abs(m41.mean() - m32.mean())
+        split_raw = abs(raw41.mean() - raw32.mean())
         print(f"\n[geometry coupling] mean centered by simplex type: "
-              f"(4,1)={m41.mean():+.4f}  (3,2)={m32.mean():+.4f}  |split|={split:.4f}")
-        print(f"  -> {'type-BLIND: teeth largely orthogonal to geometry (flat sweep = genuine)' if split < 0.2*sigma else 'type-COUPLED: term distinguishes the geometric DOF'}")
+              f"(4,1)={m41.mean():+.4f}  (3,2)={m32.mean():+.4f}")
+        print(f"  type-split: RAW={split_raw:.4f}  CENTERED={split_cen:.4f}  "
+              f"(diff={abs(split_raw-split_cen):.1e} -> centering does NOT cause blindness)")
+        print(f"  split/sigma = {split_cen/sigma:.3f}  "
+              f"-> {'type-BLIND: teeth largely orthogonal to geometry; a flat sweep is WEAK evidence' if split_cen < 0.2*sigma else 'type-COUPLED: term distinguishes the geometric DOF'}")
 
-    print(f"\n[verdict] sigma={sigma:.4f}  "
-          f"{'INERT (dead term)' if sigma < 0.05 else 'HAS TEETH' if sigma > 0.5 else 'WEAK'}")
+    # spatial structure on the dual graph (the geometry d_H actually traverses)
+    pids = list(T.pent.keys()); idx = {p: i for i, p in enumerate(pids)}
+    xs, ys = [], []
+    for p in pids:
+        for q in T.nbr[p]:
+            if q in idx and idx[q] > idx[p]:
+                xs.append(cen[idx[p]]); ys.append(cen[idx[q]])
+    if xs:
+        r_nn = float(np.corrcoef(xs, ys)[0, 1])
+        rng2 = np.random.default_rng(1)
+        null = [np.corrcoef(cen, rng2.permutation(cen))[0, 1] for _ in range(200)]
+        sig_n = float(np.std(null))
+        print(f"\n[dual-graph structure] nearest-nbr corr r_nn={r_nn:+.4f}  "
+              f"(null std {sig_n:.4f})  -> "
+              f"{'WHITE NOISE (geometry-blind)' if abs(r_nn) < 3*sig_n else f'weak structure ({abs(r_nn)/sig_n:.0f} sigma): real but small geometric channel'}")
+
+    print(f"\n[verdict] sigma={sigma:.4f} (spread present), but geometric coupling "
+          f"is WEAK (split/sigma small, r_nn small).")
+    print("  => A flat d_H sweep is WEAK evidence. Watch the cos^3 BLOB, not just")
+    print("     d_H, for whether the small geometric channel bites as beta->0.3.")
     for b in (float(x) for x in args.betas.split()):
         print(f"  beta={b}: per-pent action scale beta*sigma = {b*sigma:.4f}")
 
