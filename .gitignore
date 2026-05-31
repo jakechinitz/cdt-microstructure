@@ -1,0 +1,9 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# CDT run artifacts (checkpoints + logs written during runs)
+*.log
+v6_verify_ckpt.json
+scan_*.json
+thy_*.json
