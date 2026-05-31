@@ -4,6 +4,37 @@ Written **before** reading the results of the `eps=0.01` matched-volume sweep, s
 the interpretation is fixed in advance and cannot be reverse-engineered to fit
 whatever comes out. Committed to git for an immutable timestamp.
 
+## Evidence hierarchy (do not relabel the substrate as the headline)
+
+The bare-Regge run (β=0, and the separate bare 40k continuation) reproduces known
+AJL/Kommu CDT phenomenology: d_H climbing toward ~3.5–4 on a pure-Regge scaffold.
+That is a **validation checkpoint that the CDT instrument works** — necessary,
+expected, NOT novel, and it contains **no theory**. It cannot be evidence for
+"the theory generates 4D from the graph," because at β=0 nothing of the theory is
+in the run.
+
+The novel claim — *your* EPRL microstructure doing the generating/steering — lives
+ONLY in the β>0 sweep, which the diagnostics show is weakly geometry-coupled and
+whose most probable honest outcome is a decoupling null. So the hierarchy is:
+
+  * Bare 40k climb / β=0  → "the substrate/instrument works." Figure 1. Bank as
+    validation, never as the headline.
+  * β=0.3 blob vs β=0 blob at matched volume → THE experiment. The one number the
+    sweep exists to produce; most likely a decoupling null, which is a real
+    finding stated as such — and stops being one if dressed as "graph makes 4D."
+
+## Mechanical note on the bare 40k continuation (read first rows with care)
+
+The 40k bare run was resumed from `old/scan_40000.json`, which holds N4≈190,498 —
+an EARLIER/smaller checkpoint than the N4≈223k at which the d_H≈3.51 reading
+occurred. So this is NOT a seamless continuation of that climb: with
+`extra_state absent` (thermalization not carried over) and a smaller N4, the
+first logged rows will read LOWER than 3.51 and must re-equilibrate/re-grow back
+through ~223k before d_H is comparable. Do not read the opening dip as a result.
+(A nearer-continuous seed exists in the contaminated-era `results/scan_40000.json`
+at N4≈223k — valid geometry for a bare continuation despite its double-writer
+history — if a true continuation is wanted later.)
+
 ## What is running
 
 Four runs, each resumed from the same thermalized bare 20k checkpoint
