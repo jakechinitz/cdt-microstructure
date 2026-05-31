@@ -118,26 +118,73 @@ class Intertwiners:
 
 
 # ---------------------------------------------------------------------------
+# EPRL centering: remove the trivial cosmological-constant (volume) shift
+# ---------------------------------------------------------------------------
+
+class Centering:
+    """The raw EPRL action S_EPRL = sum_p (-log|amp_p|) is EXTENSIVE: its bulk is
+    just (mean per-pentachoron cost) * N4, i.e. a renormalization of kappa_4 (the
+    cosmological constant). That trivial piece collapses/inflates the universe and
+    is normalization-dependent (artefact-grade for the frozen-j3 tensor) -- it is
+    NOT the physics. Subtracting a fixed reference mu per pentachoron,
+
+        S_EPRL -> sum_p (-log|amp_p| - mu),
+
+    leaves only the FLUCTUATIONS of the amplitude across configurations -- the
+    part that can actually steer geometry SHAPE -- and makes the term
+    volume-neutral, so kappa_4 stays at its bare value across the whole beta
+    sweep (no per-beta retuning). mu is auto-calibrated once from the starting
+    configuration (or fixed via --eprl-mu)."""
+    def __init__(self, enabled=True, mu_fixed=None):
+        self.enabled = enabled
+        self.mu_fixed = mu_fixed
+        self.mu = None                      # set once by calibrate()
+
+    def value(self):
+        return (self.mu or 0.0) if self.enabled else 0.0
+
+    def calibrate(self, raw_costs):
+        """Fix mu on first call only (so it never drifts mid-run)."""
+        if not self.enabled:
+            self.mu = 0.0
+            return
+        if self.mu is not None:
+            return
+        if self.mu_fixed is not None:
+            self.mu = float(self.mu_fixed)
+        else:
+            costs = list(raw_costs)
+            self.mu = (sum(costs) / len(costs)) if costs else 0.0
+        print(f"# [EPRL centering] mu = {self.mu:.4f} per pentachoron "
+              f"({'fixed' if self.mu_fixed is not None else 'auto-calibrated'}); "
+              f"EPRL term now measures fluctuations about the mean "
+              f"(volume-neutral -- keep k4 at the bare value)", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # Global (O(N) per move) EPRL action + heat-bath  -- the reference path
 # ---------------------------------------------------------------------------
 
-def make_eprl_action(intw, Ttensor):
-    """-sum_p log|T[face intertwiners of p]| recomputed over ALL pentachora.
-    Correct but O(N) per move; use IncrementalEPRL for large runs. Uses
-    ensure() (add-only) so a rejected proposal never drops a surviving label."""
+def make_eprl_action(intw, Ttensor, centering):
+    """-sum_p (log|T[faces of p]| + mu) recomputed over ALL pentachora (mu is the
+    centering constant; mu=0 => raw extensive action). Correct but O(N) per move;
+    use IncrementalEPRL for large runs. Uses ensure() (add-only) so a rejected
+    proposal never drops a surviving label."""
     def eprl(T):
         intw.ensure(T)
-        s = 0.0
+        raw = []
         for p in T.pent:
             amp = abs(Ttensor[intw.faces(T, p)])
-            s += -np.log(amp if amp > 1e-300 else 1e-300)
-        return s
+            raw.append(-np.log(amp if amp > 1e-300 else 1e-300))
+        centering.calibrate(raw)            # fixes mu on the first evaluation
+        mu = centering.value()
+        return sum(c - mu for c in raw)
     return eprl
 
 
-def make_geometry_action(mode, intw, Ttensor, k0, Delta, k4, beta_eprl):
+def make_geometry_action(mode, intw, Ttensor, k0, Delta, k4, beta_eprl, centering):
     """Build the (global) geometry action for the chosen coupling mode."""
-    eprl = make_eprl_action(intw, Ttensor)
+    eprl = make_eprl_action(intw, Ttensor, centering)
     if mode == "eprl_only":
         return eprl
     if mode == "regge_plus_eprl":
@@ -189,7 +236,8 @@ class IncrementalEPRL:
     pentachora with fresh pids, so we never 'roll back' -- we just absorb the
     undo's own change-log), so it always matches the current triangulation.
     """
-    def __init__(self, intw, Ttensor, mode, k0, Delta, k4, beta_eprl, rng):
+    def __init__(self, intw, Ttensor, mode, k0, Delta, k4, beta_eprl, rng,
+                 centering=None):
         self.intw = intw
         self.T = Ttensor
         self.D = intw.D
@@ -197,7 +245,8 @@ class IncrementalEPRL:
         self.use_regge = (mode == "regge_plus_eprl")
         self.beta = beta_eprl if self.use_regge else 1.0
         self.k0, self.Delta, self.k4 = k0, Delta, k4
-        self.contrib = {}      # pid -> -log|amp|
+        self.centering = centering if centering is not None else Centering(enabled=False)
+        self.contrib = {}      # pid -> (-log|amp| - mu)  [centered]
         self.S_eprl = 0.0
         self.regge_prev = 0.0
         self._pending_regge = 0.0
@@ -206,10 +255,14 @@ class IncrementalEPRL:
     def _regge(self, T):
         return regge_action(T, self.k0, self.Delta, self.k4) if self.use_regge else 0.0
 
-    def _contrib(self, T, p):
+    def _raw_contrib(self, T, p):
         faces = tuple(self.intw.lab[frozenset((p, T.nbr[p][i]))] for i in range(5))
         amp = abs(self.T[faces])
         return -np.log(amp if amp > 1e-300 else 1e-300)
+
+    def _contrib(self, T, p):
+        """Centered per-pentachoron contribution (raw -log|amp| minus mu)."""
+        return self._raw_contrib(T, p) - self.centering.value()
 
     def _ensure_labels(self, T, pids):
         for p in pids:
@@ -242,14 +295,15 @@ class IncrementalEPRL:
 
     # --- driver interface --------------------------------------------------
     def full(self, T):
-        """Recompute everything from scratch and prime the cache."""
+        """Recompute everything from scratch and prime the cache. On the very
+        first call this also calibrates the centering constant mu from the
+        starting configuration."""
         self.intw.sync(T)
-        self.contrib = {}
-        self.S_eprl = 0.0
-        for p in T.pent:
-            c = self._contrib(T, p)
-            self.contrib[p] = c
-            self.S_eprl += c
+        raw = {p: self._raw_contrib(T, p) for p in T.pent}
+        self.centering.calibrate(raw.values())     # fixes mu once
+        mu = self.centering.value()
+        self.contrib = {p: c - mu for p, c in raw.items()}
+        self.S_eprl = sum(self.contrib.values())
         self.regge_prev = self._regge(T)
         return self.regge_prev + self.beta * self.S_eprl
 
@@ -305,6 +359,16 @@ def main():
     p.add_argument("--audit-every", type=int, default=25,
                    help="with --local-eprl, recompute-and-check the action every "
                         "N sweeps (0 disables; aborts on drift)")
+    p.add_argument("--center-eprl", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="subtract the mean per-pentachoron EPRL cost so the "
+                        "amplitude term is volume-neutral (removes the trivial "
+                        "cosmological-constant shift). Keep --k4 at the bare value "
+                        "across the whole beta sweep. Use --no-center-eprl for the "
+                        "raw extensive action (then retune --k4 per beta).")
+    p.add_argument("--eprl-mu", type=float, default=None,
+                   help="fixed centering constant mu per pentachoron; default "
+                        "auto-calibrates from the starting configuration")
     p.add_argument("--target-n41", type=int, default=4000)
     p.add_argument("--K", type=int, default=24)
     p.add_argument("--k0", type=float, default=2.2)
@@ -326,13 +390,14 @@ def main():
           "(v6_verify_run.py). Amplitude is frozen-j3 (artefact-grade absolutes);"
           " the robust signal is the bare-vs-EPRL comparison at matched volume.")
     print(f"   mode={args.mode}  beta_eprl={args.beta_eprl}  "
-          f"local_eprl={args.local_eprl}\n")
+          f"local_eprl={args.local_eprl}  center_eprl={args.center_eprl}\n")
 
     from vertex_tensor import FaithfulVertex
     Ttensor = FaithfulVertex.load(args.vertex).dense_tensor().astype(np.float64)
     D = Ttensor.shape[0]
     rng = np.random.default_rng(args.seed)
     intw = Intertwiners(None, D, rng)             # labels filled lazily on first T
+    centering = Centering(enabled=args.center_eprl, mu_fixed=args.eprl_mu)
 
     common = dict(k0=args.k0, Delta=args.Delta, k4=args.k4,
                   target_N41=args.target_n41, K=args.K, eps=args.eps,
@@ -343,13 +408,13 @@ def main():
 
     if args.local_eprl:
         inc = IncrementalEPRL(intw, Ttensor, args.mode, args.k0, args.Delta,
-                              args.k4, args.beta_eprl, rng)
+                              args.k4, args.beta_eprl, rng, centering=centering)
         heatbath = make_heatbath(intw, Ttensor)
         T = run(f"EPRL [{args.mode}, local]", delta_action=inc,
                 extra_hook=heatbath, audit_every=args.audit_every, **common)
     else:
         geom = make_geometry_action(args.mode, intw, Ttensor, args.k0, args.Delta,
-                                    args.k4, args.beta_eprl)
+                                    args.k4, args.beta_eprl, centering)
         heatbath = make_heatbath(intw, Ttensor)
         T = run(f"EPRL [{args.mode}, global]", geometry_action=geom,
                 extra_hook=heatbath, **common)
@@ -361,7 +426,9 @@ def main():
     print("  WITH-THEORY (EPRL) RESULT  -- compare to bare verification run")
     print("=" * 64)
     okf, repf = getattr(T, "_final_verify", (None, {}))
-    print(f"  mode={args.mode}  beta_eprl={args.beta_eprl}")
+    cen = ("off" if not args.center_eprl else
+           f"mu={centering.mu:.4f}" if centering.mu is not None else "on")
+    print(f"  mode={args.mode}  beta_eprl={args.beta_eprl}  centering={cen}")
     print(f"  manifold check (gluing-based + S^3 links): "
           f"{'PASS' if okf else 'FAIL'}  [links={repf.get('link_failures')}, "
           f"simplicial={repf.get('gluing', {}).get('is_simplicial')}]")
