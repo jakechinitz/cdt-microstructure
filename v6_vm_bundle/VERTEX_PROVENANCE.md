@@ -124,28 +124,36 @@ engine, recorded for pre-registration):
 1. It couples **strongly** to geometry (raw per-move ΔS_EPRL ~ 14–20× ΔS_Regge;
    note this is the *uncentered* scale — the v6 runs use a mean-subtracted /
    centered action, which greatly reduces the effective coupling).
-2. At frozen j = 3 it tends to steer geometry toward **branched / sparse**
-   configurations — i.e. d_H / d_s *downward*, away from 4.
-3. This downward push is the **expected frozen-j behavior**, NOT a falsification
-   of the theory. The theory's own escape hatch — that a peaked-j amplitude
-   corrects the direction — requires the multi-j tensors that do not yet exist.
+2. In separate v5 shell tests **of the condensate model measuring d_s** (a
+   *different* model from the v6 CDT/d_H run), this tensor appeared to steer
+   geometry toward branched/sparse — i.e. d_s downward. **This is an unverified,
+   model-specific observation, NOT a theory prediction**, and it has not been
+   reproduced in the v6 d_H run. Do not treat "down" as the expected direction.
 
-### Pre-registered interpretation (lock this in before reading results)
+### What we are actually testing — and expecting
 
-At matched volume, with a thermalized and unfrozen Markov chain:
+The premise of coupling the EPRL amplitude to the geometry is that the quantum-
+gravity amplitude should be **compatible with, or actively support, physical 4D
+de Sitter spacetime**. So the success band is **flat-or-better**: at matched
+volume and thermalized, as the coupling β increases, d_H should **hold near, or
+climb above, the bare value (~3.37 at N41=20k)**. A downward drift toward the
+branched-polymer regime (d_H → ~2) is the **concerning** direction — the
+amplitude fighting the geometry — not an expected or pre-excused outcome.
 
-| Observation | Interpretation |
+| Observation (matched volume, thermalized, unfrozen chain) | Reading |
 |---|---|
-| EPRL pushes d_H/d_s **down** (branched/sparse) | **Expected frozen-j behavior.** Consistent with theory + known peaked-j gap. **Does NOT falsify.** |
-| d_H/d_s stays **flat** at the bare value | EPRL fluctuations don't steer at frozen-j. Also consistent. |
-| EPRL pushes d_H/d_s **up** toward 4 | A *surprise* — frozen-j is not expected to help. |
+| d_H **climbs** above bare as β ↑ / blob sharpens | Theory **works** — amplitude supports 4D. |
+| d_H **flat** at bare (~3.37) / blob holds | Theory **survives** — amplitude compatible with 4D. (Success band.) |
+| d_H **drops** toward ~2 as β ↑ / blob dissolves | **Concerning** — amplitude degrading the 4D geometry. Investigate; do not wave away. |
 | Markov chain frozen (acceptance ~0) | **Not a result** — coupling too strong; discard. |
 
-**Consequence for scope:** a frozen-j run can only *check that frozen-j behaves
-as the peaked-j argument predicts*. It **cannot falsify the theory**, because the
-frozen-j truncation is a known, expected-to-be-wrong-direction placeholder. A
-genuine falsification test requires building the peaked-j (multi-j) amplitude
-first. Treat any frozen-j result as a consistency check, not a verdict.
+**Scope caveat (honest, but does not pre-judge direction):** because this is the
+frozen-j = 3 truncation rather than the full peaked-j amplitude, a *clean*
+negative (down-push) here would still warrant building the peaked-j tensors
+before calling the theory falsified — frozen-j may not represent the full
+amplitude's behavior. But that is a follow-up, not a reason to expect or excuse a
+downward result in advance. We expect flat-or-better and we read the direction
+honestly.
 
 ---
 
