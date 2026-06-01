@@ -63,6 +63,32 @@ real question the paper does not settle. A negative here is a negative about the
 FROZEN-j realization, and could in principle be lifted by peaked-j (which does not
 exist yet) — same standing caveat as the sweep.
 
+## Timing asymmetry + transient trap (pre-register BEFORE reading)
+
+Collapse and de Sitter have very different detection times, and the inconvenient
+one is fast:
+- **Collapse is FAST & decisive.** A geometry-blind amplitude that can't hold 4D
+  falls toward the entropic phase quickly (uncentered smoke reacted ~20 sweeps).
+  "Did it fail to hold a manifold / stable shape" — answerable in hours, decisive
+  if NO.
+- **De Sitter is SLOW & deceptive to confirm.** d_s approaches 4 FROM BELOW with
+  volume (β=0 scan: d_s_peak 2.36→2.65 over N4 2k→18k, peak σ marching out). So a
+  genuine de Sitter result reads LOW and still-climbing at small N4/short therm —
+  indistinguishable early from "not de Sitter." Confirmation needs volume +
+  equilibration, overnight+, not hours.
+
+START FRESH (no Regge-equilibrated resume). Reason: resuming from a Regge-shaped
+checkpoint means the first hours are a TRANSIENT decay of the old GR-built de
+Sitter state, not the EPRL equilibrium. An early "looks de Sitter" from a Regge
+seed is the LEAST trustworthy reading — a false positive that fades. A de Sitter
+result from a fresh (non-Regge) start is the one with no asterisk, because it
+can't be the starting config talking.
+
+Pre-committed: **the early "still looks like de Sitter" reading is the transient,
+NOT the verdict.** Do not bank it. The verdict is the thermalized, large-N d_s
+flow rising toward 4 with the peak marching outward — same bar as the β=0 scaling
+test. Early reads can only decisively show the NEGATIVE (collapse).
+
 ## What to actually run / read
 
 1. Launch centered eprl_only at matched volume, long thermalization. Watch that it
