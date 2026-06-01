@@ -104,6 +104,35 @@ floor~ceiling overlap by comparing eprl_only against one endpoint ("it beat the
 floor!"). Floor-vs-ceiling separation is the GATE; if the gate fails, the ladder has
 no rungs and that overlap IS the answer.
 
+## CRITICAL read-method correction: compare d_s(N4) CURVES, not endpoints
+
+Discovered at sweep ~200: eps pins N41 (rock-solid ~20,078) but N4 is NOT pinned
+and grows toward a high entropic equilibrium (no_action: N4/N41 -> 6+, growth rate
+peaked ~661/sw at sweep 100 and decelerating -> saturating, NOT unbounded runaway).
+Because d_s runs on the DUAL graph whose size is N4 (not N41), and each ACTION
+equilibrates at a different N4 (no_action maximizes N32 entropy; Regge's k4 term
+suppresses N4), the three rungs end at different N4. So comparing d_s at THERMALIZED
+ENDPOINTS is N4-confounded — the size->dimension artifact through the channel eps
+doesn't control.
+
+Do NOT fix this by switching to an eps*(N4-target)^2 penalty: the N4/N41 ratio is
+PART OF WHAT EACH ACTION DOES (an observable), not a nuisance to clamp. Forcing
+matched N4 would distort each action's natural geometry — a different confound.
+
+The fix is in the READ, and the sidecar already logs what's needed (d_s curve WITH
+its N4 at every measurement):
+  * Compare **d_s(N4) curves** across the three runs at COMMON N4 they each pass
+    through — apples-to-apples at matched graph size — NOT at thermalized endpoints.
+  * Report the N4/N41 ratio per action as its own observable (no_action high,
+    Regge low).
+  * Caveat: at a common N4, the floor (which reached it fast) is LESS thermalized
+    than Regge (which reached it slowly). Prefer common-N4 points where BOTH runs
+    are near-equilibrated there, to avoid trading the volume confound for an
+    equilibration confound.
+
+No relaunch / no eps change needed — the run as-is logs d_s-vs-N4 throughout; only
+the analysis method changes from endpoint-matching to curve-matching.
+
 ## Cost / timing
 
 Three runs grown to N4~90–100k = the overnight window, not hours. Collapse (if
