@@ -58,23 +58,41 @@ that does not currently exist (the multi-j / peaked-j tensors were never built).
 So the accurate status is: *the clean frozen-j-free generation test is not
 runnable today; both frozen-j runs are complementary proxies, neither decisive.*
 
-## Empirical caveat (do not overstate the "blind => collapse" prediction)
+## Empirical head-to-head (small scale, both modes, same target N41=2500)
 
-A matched-volume head-to-head was run (centered, small scale, eps-held volume):
 ```
-centered eprl_only, N41 held ~2550:
-  sw 40  d_H 1.74  blob 2.49
-  sw 240 d_H 2.31  blob 2.22   (valid throughout)
+centered   eprl_only:  N41 held ~2550;  d_H 1.74->2.31;  blob ~2.2;  valid throughout
+uncentered eprl_only:  N41 held ~1020;  d_H 1.36->1.97;  blob ~2.8->3.55; valid throughout
 ```
-Centered eprl_only did NOT collapse to a structureless stalk at this scale — d_H
-*rose* 1.74->2.31 and the blob persisted. So the strong prediction "centered =
-entropic collapse by construction" is NOT confirmed empirically; the weak r_nn
-channel may carry more leverage than the type-split alone implied. This does not
-overturn the decomposition (which is about trust + drive, not about whether the
-fluctuation is exactly zero), but it does mean the centered run is informative,
-not degenerate, and worth letting finish. N4~3800 is tiny — read as trend, not
-value; d_H low-and-climbing is the expected finite-size signature and cannot yet
-distinguish "climbing toward 4" from "climbing then saturating low."
+
+Three results:
+
+1. **Volume-pin prediction CONFIRMED.** Uncentered's mu*N4 term relocates the
+   volume pin DOWN by ~mu/(2*eps) ~ 1400 simplices: target 2500 - 1400 = ~1100,
+   observed ~1020. So the driving channel acts as a cosmological constant that
+   *shifts where volume sits*, NOT a runaway. (Reviewer's "volume wanders" refuted;
+   the eps penalty regulates in both modes, just balanced at different N4.)
+
+2. **Neither mode collapsed.** The strong "geometry-blind => entropic collapse by
+   construction" prediction FAILED for BOTH centered and uncentered: both held
+   valid manifolds with persistent blobs (2.2 and 3.5) and rising d_H. At this
+   scale neither relaxes to a structureless stalk. So "centered is degenerate by
+   construction" is not borne out, and the decomposition must NOT be read as
+   predicting collapse — it is about trust+drive, not about the dynamics dying.
+
+3. **The head-to-head is itself volume-confounded** (the irony): because the two
+   modes pinned at different N4 (~2550 vs ~1020), uncentered's higher blob /
+   lower d_H are partly just small-volume effects, not a clean shape difference.
+   So this comparison CANNOT be read as "uncentered builds a better blob." To
+   compare shape cleanly you must match N4 across modes (raise uncentered's target
+   by ~1400, or retune k4), which has not been done.
+
+Caveat on all of the above: N4 ~ 1000-3800 is tiny and finite-size dominated;
+read trends, not absolute d_H. None of this overturns the analytic decomposition;
+it sharpens it: the driving channel demonstrably moves volume (confirming it has
+teeth on N4), the trustworthy channel demonstrably does not kill the geometry
+(both hold blobs), and a clean shape test remains blocked by volume-matching plus
+the frozen-j trust problem.
 
 ## What to do (the meta-point)
 
