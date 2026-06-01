@@ -1,9 +1,26 @@
 #!/usr/bin/env python3
-"""Ladder read: GATE 0 (equilibration overlap) -> separation -> eprl position.
+"""Ladder read: Gate-0-INDEPENDENT signals first, THEN gated cross-run comparison.
 
 Reads the three d_s(sigma) sidecars (ds_floor / ds_eprl / ds_regge .jsonl), each a
-JSONL of {sweep, N4, N41, d_H, sigma[], d_s[]} per measurement, and applies the
-pre-registered read ORDER. It refuses to advance a gate until the prior one passes.
+JSONL of {sweep, N4, N41, d_H, sigma[], d_s[]} per measurement.
+
+IMPORTANT (do not let Gate 0 eat the run): Gate 0 only blocks ONE comparison --
+the thermalized-endpoint cross-run d_s at matched volume. Several OTHER signals are
+readable regardless of whether Gate 0 passes, and are printed FIRST,
+unconditionally:
+  SIGNAL A -- N4/N41 ratio ordering: what each action does to volume composition at
+    fixed N41 (no_action high via N32 entropy; Regge low via k4). EPRL near Regge =
+    GR-like; near no_action = entropic. The single most useful readable result, and
+    it needs no matching.
+  SIGNAL B -- per-run d_s(sigma) flow SHAPE: does each run's own flow bend up
+    (manifold) or stay flat (expander)? Characterizes each curve without cross-run
+    matching.
+  SIGNAL C -- viability: does eprl_only hold a stable valid manifold / pin N41 at
+    all under pure-amplitude weighting?
+These reach the COMPATIBILITY claim (j=3 structure is CDT-like vs expander-like),
+NOT generation. Modest-but-real, and robust to Gate 0 failing.
+
+THEN the gated cross-run comparison (the crisp result, only if matchable):
 
 GATE 0 -- equilibration overlap (the load-bearing precondition):
   The three actions pin N41 but settle at DIFFERENT N4 (no_action high via N32
@@ -89,6 +106,55 @@ def main():
         n41 = [r["N41"] for r in v]
         print(f"  {k:6}: {len(v)} curves, N4 {min(n4)}..{max(n4)}, "
               f"N41~{int(np.median(n41))}, N4/N41~{np.median(n4)/np.median(n41):.1f}")
+
+    # ----------------------------------------------------------------------
+    # READABLE SIGNALS THAT DO NOT DEPEND ON GATE 0 (cross-run matching).
+    # These survive an overlap failure -- print them FIRST and unconditionally,
+    # so an instrument-limit Gate-0 failure never eats the rest of the run.
+    # ----------------------------------------------------------------------
+    print("\n=== SIGNAL A: N4/N41 ratio ordering (Gate-0-INDEPENDENT) ===")
+    print("  What each action does to volume COMPOSITION at fixed N41. No matching")
+    print("  needed. no_action high (entropy maxes N32); Regge low (k4 suppresses N4).")
+    ratios = {}
+    for k, v in runs.items():
+        # use the last few measurements (most equilibrated) for the ratio
+        tail = v[-5:] if len(v) >= 5 else v
+        r = float(np.median([row["N4"] / max(row["N41"], 1) for row in tail]))
+        ratios[k] = r
+        print(f"  {k:6}: N4/N41 = {r:.2f}")
+    if all(k in ratios for k in ("floor", "eprl", "regge")):
+        df, dr = abs(ratios["eprl"] - ratios["floor"]), abs(ratios["eprl"] - ratios["regge"])
+        verdict = ("CDT/Regge-like (GR-like volume composition)" if dr < df else
+                   "expander/no-action-like (entropic volume composition)" if df < dr else
+                   "intermediate")
+        print(f"  -> EPRL ratio {ratios['eprl']:.2f} is closer to "
+              f"{'Regge' if dr < df else 'no_action' if df < dr else 'neither'} "
+              f"=> j=3 structure looks {verdict}")
+        print("  (compatibility channel, NOT generation; readable regardless of Gate 0.)")
+
+    print("\n=== SIGNAL B: per-run d_s(sigma) FLOW SHAPE (Gate-0-INDEPENDENT) ===")
+    print("  Each run's OWN flow character: does d_s bend up at large sigma (manifold)")
+    print("  or stay flat (expander)? No cross-run common-N4 needed.")
+    for k, v in runs.items():
+        last = v[-1]
+        ds = np.array(last["d_s"]); sig = np.array(last["sigma"])
+        # short-scale vs large-scale d_s on this run's own latest curve
+        lo = float(np.median(ds[sig < np.percentile(sig, 25)]))
+        hi = float(np.median(ds[sig > np.percentile(sig, 60)]))
+        shape = ("MANIFOLD-like (bends up at large scale)" if hi > lo + 0.3 else
+                 "FLAT/expander-like" if abs(hi - lo) <= 0.3 else "falling")
+        print(f"  {k:6} (N4={last['N4']}): d_s small-σ~{lo:.2f} large-σ~{hi:.2f} -> {shape}")
+    print("  -> compare EPRL's shape to floor vs Regge: does it have the manifold")
+    print("     character (like Regge) or the flat character (like no_action)?")
+
+    print("\n=== SIGNAL C: viability (Gate-0-INDEPENDENT) ===")
+    for k, v in runs.items():
+        n41 = [r["N41"] for r in v]
+        held = max(abs(np.array(n41) - np.median(n41))) < 0.1 * np.median(n41)
+        print(f"  {k:6}: N41 held={held}, grew to N4={v[-1]['N4']} "
+              f"(valid manifold throughout = run didn't abort)")
+    print("  -> eprl_only holding a stable valid manifold at all = basic geometric")
+    print("     viability of pure-amplitude weighting, independent of any matching.")
 
     eq = {k: equilibrated_windows(v, args.equil_cv) for k, v in runs.items()}
     print("\n=== GATE 0: equilibration overlap ===")
