@@ -346,10 +346,13 @@ class IncrementalEPRL:
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mode", choices=["regge_plus_eprl", "eprl_only"],
+    p.add_argument("--mode", choices=["regge_plus_eprl", "eprl_only", "no_action"],
                    default="regge_plus_eprl",
-                   help="regge_plus_eprl (default, safer): Regge + beta_eprl*S_EPRL; "
-                        "eprl_only: pure amplitude geometry")
+                   help="regge_plus_eprl (default): Regge + beta_eprl*S_EPRL; "
+                        "eprl_only: pure amplitude geometry; "
+                        "no_action: FLOOR control -- action=0 (uniform measure over "
+                        "CDT-legal volume-fixed triangulations), same moves/eps/"
+                        "harness, no EPRL and no heat-bath. The ladder baseline.")
     p.add_argument("--beta-eprl", type=float, default=0.1,
                    help="EPRL coupling strength in regge_plus_eprl mode "
                         "(sweep from ~0 upward to see the steer)")
@@ -391,6 +394,37 @@ def main():
           " the robust signal is the bare-vs-EPRL comparison at matched volume.")
     print(f"   mode={args.mode}  beta_eprl={args.beta_eprl}  "
           f"local_eprl={args.local_eprl}  center_eprl={args.center_eprl}\n")
+
+    # FLOOR control: action=0, no EPRL, no heat-bath -- identical run() harness
+    # (moves, eps, measurement, checkpoint) so it is directly comparable to the
+    # eprl_only treatment and Regge ceiling at matched volume.
+    if args.mode == "no_action":
+        print("   FLOOR: action=0 (uniform measure over CDT-legal volume-fixed "
+              "triangulations). No EPRL, no heat-bath.\n")
+        T = run("no_action [FLOOR]", k0=args.k0, Delta=args.Delta, k4=args.k4,
+                target_N41=args.target_n41, K=args.K, eps=args.eps,
+                seed=args.seed, max_sweeps=args.max_sweeps,
+                measure_every=args.measure_every, checkpoint=args.checkpoint,
+                resume=args.resume, geometry_action=(lambda T: 0.0),
+                wall_budget_s=(args.wall_hours*3600 if args.wall_hours else None))
+        ids, adj = dual_adjacency(T)
+        dH = hausdorff_dim(adj); pm = profile_metrics(volume_profile(T))
+        rails = torus_rails(T.n_pent())
+        okf, repf = getattr(T, "_final_verify", (None, {}))
+        print("\n" + "=" * 64)
+        print("  NO-ACTION FLOOR RESULT  -- the ladder baseline")
+        print("=" * 64)
+        print(f"  manifold check: {'PASS' if okf else 'FAIL'}  "
+              f"[links={repf.get('link_failures')}, "
+              f"simplicial={repf.get('gluing', {}).get('is_simplicial')}]")
+        print(f"  final N4={T.n_pent()}  N41={T.type_counts()[0]}")
+        print(f"  d_H = {dH:.2f}   rails: 2t={rails[2][1]:.2f} "
+              f"3t={rails[3][1]:.2f} 4t={rails[4][1]:.2f}")
+        print(f"  blob score = {pm['blob_score']:.2f}   active slices = "
+              f"{pm['active_slices']}/{T.K}")
+        print("  (this is what the scaffold produces with NO action -- subtract it "
+              "from eprl_only / Regge at MATCHED volume.)")
+        return
 
     from vertex_tensor import FaithfulVertex
     Ttensor = FaithfulVertex.load(args.vertex).dense_tensor().astype(np.float64)
