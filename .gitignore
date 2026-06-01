@@ -5,5 +5,9 @@ __pycache__/
 # CDT run artifacts (checkpoints + logs written during runs)
 *.log
 v6_verify_ckpt.json
+v6_theory_ckpt.json
 scan_*.json
 thy_*.json
+eprl_only_*.json
+*_ckpt.json
+results/
