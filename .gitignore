@@ -10,4 +10,5 @@ scan_*.json
 thy_*.json
 eprl_only_*.json
 *_ckpt.json
+*.jsonl
 results/

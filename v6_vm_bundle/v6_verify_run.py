@@ -45,13 +45,18 @@ def main():
     p.add_argument("--checkpoint", type=str, default="v6_verify_ckpt.json")
     p.add_argument("--resume", type=str, default=None)
     p.add_argument("--wall-hours", type=float, default=None, help="stop after this many hours")
+    p.add_argument("--ds-every", type=int, default=0,
+                   help="every N measurements, log full d_s(sigma) flow to --ds-out")
+    p.add_argument("--ds-out", type=str, default=None,
+                   help="sidecar JSONL file for d_s(sigma) curves (ladder ceiling)")
     args = p.parse_args()
 
     T = run("bare-Regge (verification)", k0=args.k0, Delta=args.Delta, k4=args.k4,
             target_N41=args.target_n41, K=args.K, eps=args.eps, seed=args.seed,
             max_sweeps=args.max_sweeps, measure_every=args.measure_every,
             checkpoint=args.checkpoint, resume=args.resume,
-            wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
+            wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None),
+            ds_every=args.ds_every, ds_out=args.ds_out)
 
     # final verdict
     ids, adj = dual_adjacency(T)

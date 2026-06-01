@@ -210,11 +210,31 @@ def load_checkpoint(path):
 # The run protocol (geometry-only; action is pluggable via the driver)
 # ---------------------------------------------------------------------------
 
+def ds_flow_curve(adj, seed=0):
+    """Full calibrated d_s(sigma) curve on a dual graph, via the tori-validated
+    linkA heat-kernel estimator. Returns (sigmas, d_s_calibrated). Used for the
+    floor-vs-ceiling separation check, which is about FLOW SHAPE across sigma --
+    a single peak number cannot show whether Regge bends toward 4 at large sigma
+    while the expander stays flat. (d_s under-reads CDT dual graphs in absolute
+    terms; the comparison at matched volume is what's read, not the value.)"""
+    import step3_linkA_harness as linkA
+    from scipy.sparse import lil_matrix
+    N = len(adj)
+    A = lil_matrix((N, N))
+    for i, nb in enumerate(adj):
+        for j in nb:
+            A[i, j] = 1.0
+    a, b = linkA.fit_calibration(verbose=False)
+    ts, ds = linkA.raw_ds(A.tocsr(), seed=seed)
+    return ts.tolist(), (a * ds + b).tolist()
+
+
 def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
         seed=0, max_sweeps=20000, measure_every=50, checkpoint=None,
         strictness=2, wall_budget_s=None, verbose=True, resume=None,
         extra_hook=None, geometry_action=None, extra_state=None,
-        delta_action=None, audit_every=0, link_check_every=10):
+        delta_action=None, audit_every=0, link_check_every=10,
+        ds_every=0, ds_out=None):
     """Run CDT to `target_N41`, then thermalize, logging d_H + the volume
     profile and checkpointing.
 
@@ -343,6 +363,19 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
                                       "profile_metrics": pm,
                                       "verify_ok": bool(okv), "links": link_s},
                                 extra=ex)
+            # Full d_s(sigma) curve for the floor-vs-ceiling separation check.
+            # Appended as one JSON line per measurement to the sidecar file, so the
+            # whole flow-shape history is on disk (not just the live d_H row).
+            if ds_every and ds_out and (meas_i % ds_every == 0):
+                sig, dsc = ds_flow_curve(adj, seed=seed)
+                with open(ds_out, "a") as f:
+                    f.write(json.dumps({"sweep": sw, "N4": T.n_pent(),
+                                        "N41": T.type_counts()[0], "d_H": dH,
+                                        "sigma": sig, "d_s": dsc}) + "\n")
+                if verbose:
+                    peak = max(dsc)
+                    print(f"#   [d_s flow] sweep {sw} N4={T.n_pent()} "
+                          f"peak d_s={peak:.2f} -> {ds_out}", flush=True)
         if wall_budget_s and time.time() - t0 > wall_budget_s:
             if verbose:
                 print(f"# wall budget reached at sweep {sw}")

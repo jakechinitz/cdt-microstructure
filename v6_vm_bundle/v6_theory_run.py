@@ -387,6 +387,12 @@ def main():
     p.add_argument("--checkpoint", type=str, default="v6_theory_ckpt.json")
     p.add_argument("--resume", type=str, default=None)
     p.add_argument("--wall-hours", type=float, default=None)
+    p.add_argument("--ds-every", type=int, default=0,
+                   help="every N measurements, log the FULL d_s(sigma) flow curve "
+                        "to --ds-out (for the floor-vs-ceiling separation check). "
+                        "0 = off.")
+    p.add_argument("--ds-out", type=str, default=None,
+                   help="sidecar JSONL file for the d_s(sigma) curves")
     args = p.parse_args()
 
     print("!! WITH-THEORY (EPRL) run. Verify the BARE engine first "
@@ -406,7 +412,8 @@ def main():
                 seed=args.seed, max_sweeps=args.max_sweeps,
                 measure_every=args.measure_every, checkpoint=args.checkpoint,
                 resume=args.resume, geometry_action=(lambda T: 0.0),
-                wall_budget_s=(args.wall_hours*3600 if args.wall_hours else None))
+                wall_budget_s=(args.wall_hours*3600 if args.wall_hours else None),
+                ds_every=args.ds_every, ds_out=args.ds_out)
         ids, adj = dual_adjacency(T)
         dH = hausdorff_dim(adj); pm = profile_metrics(volume_profile(T))
         rails = torus_rails(T.n_pent())
@@ -438,7 +445,8 @@ def main():
                   seed=args.seed, max_sweeps=args.max_sweeps,
                   measure_every=args.measure_every, checkpoint=args.checkpoint,
                   resume=args.resume, extra_state=intw,
-                  wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
+                  wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None),
+                  ds_every=args.ds_every, ds_out=args.ds_out)
 
     if args.local_eprl:
         inc = IncrementalEPRL(intw, Ttensor, args.mode, args.k0, args.Delta,
