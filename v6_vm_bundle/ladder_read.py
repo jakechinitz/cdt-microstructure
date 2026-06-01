@@ -64,18 +64,24 @@ def load(path):
     return rows
 
 
-def equilibrated_windows(rows, equil_cv=0.04, min_pts=3):
-    """Return list of (N4, d_s_curve, sweep) for measurements that are
-    'equilibrated' = the d_H is stable (low coefficient of variation) over a
-    trailing window of measurements around it. Crude but data-driven."""
+def equilibrated_windows(rows, equil_cv=0.04, min_pts=4):
+    """Return measurements that are equilibrated = N4 has STOPPED TRENDING over a
+    trailing window. CRITICAL: test N4, not d_H. d_H can plateau while N4 is still
+    climbing monotonically (observed: EPRL d_H~3.25 flat while N4 climbs 93k->99k),
+    which would falsely label a still-growing run 'equilibrated'. Since the read
+    requires matched VOLUME (N4), equilibration must be N4-stability: the trailing
+    N4 slope must be ~0 relative to its own scatter."""
     if not rows or len(rows) < min_pts:
         return []
-    dH = np.array([r["d_H"] for r in rows])
     out = []
     for i in range(min_pts - 1, len(rows)):
-        seg = dH[i - min_pts + 1:i + 1]
-        cv = seg.std() / max(abs(seg.mean()), 1e-9)
-        if cv < equil_cv:
+        seg = rows[i - min_pts + 1:i + 1]
+        n4 = np.array([r["N4"] for r in seg], float)
+        sw = np.array([r["sweep"] for r in seg], float)
+        # net drift over the window vs the window's own N4 scale
+        slope = np.polyfit(sw - sw.mean(), n4, 1)[0]
+        drift = abs(slope) * (sw[-1] - sw[0])
+        if drift < equil_cv * n4.mean():
             out.append(rows[i])
     return out
 
@@ -116,12 +122,22 @@ def main():
     print("  What each action does to volume COMPOSITION at fixed N41. No matching")
     print("  needed. no_action high (entropy maxes N32); Regge low (k4 suppresses N4).")
     ratios = {}
+    trending = {}
     for k, v in runs.items():
-        # use the last few measurements (most equilibrated) for the ratio
         tail = v[-5:] if len(v) >= 5 else v
         r = float(np.median([row["N4"] / max(row["N41"], 1) for row in tail]))
         ratios[k] = r
-        print(f"  {k:6}: N4/N41 = {r:.2f}")
+        # is N4 still climbing across the tail? then this ratio is a TRANSIENT.
+        n4 = np.array([row["N4"] for row in tail], float)
+        sw = np.array([row["sweep"] for row in tail], float)
+        drift = abs(np.polyfit(sw - sw.mean(), n4, 1)[0]) * (sw[-1] - sw[0])
+        trending[k] = drift > 0.02 * n4.mean()
+        flag = "  <-- STILL CLIMBING (transient, NOT an equilibrium value)" if trending[k] else ""
+        print(f"  {k:6}: N4/N41 = {r:.2f}{flag}")
+    if trending.get("eprl"):
+        print("  !! EPRL N4 has NOT equilibrated -- its ratio is mid-flight, climbing")
+        print("     through Regge's value toward an unknown ceiling. DO NOT bank")
+        print("     'EPRL ~ Regge'; it may keep rising toward the entropic floor.")
     if all(k in ratios for k in ("floor", "eprl", "regge")):
         df, dr = abs(ratios["eprl"] - ratios["floor"]), abs(ratios["eprl"] - ratios["regge"])
         verdict = ("CDT/Regge-like (GR-like volume composition)" if dr < df else
