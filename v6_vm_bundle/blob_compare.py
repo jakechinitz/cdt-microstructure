@@ -75,8 +75,20 @@ def main():
     ap.add_argument("--b", default="0.3", help="coupled beta")
     ap.add_argument("--vol", default="20k")
     ap.add_argument("--window", type=int, default=40, help="rows to average over the equilibrated tail")
-    ap.add_argument("--match-tol", type=float, default=0.04, help="max fractional N4 mismatch allowed")
+    ap.add_argument("--match-tol", type=float, default=0.02,
+                    help="max fractional N4 mismatch allowed. Justified, not "
+                         "eyeballed: measured blob-vs-N4 slope ~ -4.8e-6/simplex "
+                         "(N4 16k-24k), so a 2%% mismatch (~400 simplices) induces "
+                         "a blob shift ~0.002 -- an order of magnitude below the "
+                         "~0.02-0.03 run-to-run blob scatter, hence negligible vs "
+                         "any delta callable as signal. 4%% (~0.004) is also "
+                         "defensible; >5%% is not at this volume.")
     ap.add_argument("--target-n41", type=int, default=20000)
+    ap.add_argument("--bare-log", default="logs/bare_40k_cont.log",
+                    help="bare substrate run to vet for the resume-dip caveat")
+    ap.add_argument("--bare-climb-n4", type=int, default=223000,
+                    help="N4 at which the headline d_H~3.51 was read; bare run is "
+                         "only comparable to that climb once it re-grows past here")
     args = ap.parse_args()
 
     pa = f"logs/thy_b{args.a}_{args.vol}.log"
@@ -123,7 +135,11 @@ def main():
     cA, _, _ = stat(A, args.window, "cos3")
     cB, _, _ = stat(B, args.window, "cos3")
     delta = bB - bA
-    pooled = np.sqrt(sA**2 / nA + sB**2 / nB) or 1e-9
+    # pooled standard error of the difference, with a floor: blob is quantized in
+    # finite N so near-zero sample scatter over a short window must not manufacture
+    # a giant sigma. Floor at a conservative 0.01 absolute on each mean.
+    se = np.sqrt(sA**2 / nA + sB**2 / nB)
+    pooled = max(se, 0.01)
 
     print(f"\n=== THE EXPERIMENT: blob(beta={args.b}) - blob(beta={args.a}) "
           f"[avg of last {args.window} rows] ===")
@@ -143,6 +159,26 @@ def main():
             print("  BEFORE believing it: relaunch beta=0.05, 0.1 and confirm the response")
             print("  is SMOOTH/MONOTONIC in beta (rules out threshold artifact / strong-")
             print("  coupling breakage). A lone 0->0.3 jump is not yet a physical signal.")
+
+    # --- bare 40k substrate run: the resume-dip caveat (separate file) ---
+    print("\n=== bare 40k substrate run (Figure-1 VALIDATION, not headline) ===")
+    bare, badbare = load_rows(args.bare_log)
+    if not bare:
+        print(f"  (no rows yet at {args.bare_log})")
+    else:
+        last = bare[-1]
+        thb, drb = thermalized(bare)
+        below = last["N4"] < args.bare_climb_n4
+        print(f"  latest: N4={last['N4']}  d_H={last['dH']:.2f}  blob={last['blob']:.2f}  "
+              f"valid={last['valid']}  (BAD rows: {badbare})")
+        print(f"  thermalized: {'yes' if thb else 'no (still drifting ~%d)'%drb}")
+        if below:
+            print(f"  *** CAUTION: N4={last['N4']} is BELOW the {args.bare_climb_n4} where d_H~3.51")
+            print(f"      was read (resumed from the smaller 190k checkpoint, extra_state absent).")
+            print(f"      Any d_H dip here is RE-EQUILIBRATION, not a substrate result. Wait for")
+            print(f"      N4 to climb back past {args.bare_climb_n4} before comparing to 3.51.")
+        else:
+            print(f"  N4 has re-grown past {args.bare_climb_n4}: d_H now comparable to the prior climb.")
 
 
 if __name__ == "__main__":
