@@ -73,6 +73,37 @@ on the floor→ceiling ladder is the answer:
   geometries" — the move-set is still CDT's. Not "substrate dynamics from scratch."
   State this so the claim isn't broader than the run.
 
+## eps MUST match across all three (corrected — was a confound in first launch)
+
+The first launch ran floor/treatment at eps=1e-2 but Regge at eps=1e-4 ("canonical"),
+with a note that "only final N4 matters." That was WRONG and is the project's
+recurring mean-vs-distribution error: eps sets the volume-FLUCTUATION width
+(~1/sqrt(eps)), and the d_s heat-kernel estimator averages diffusion over the
+volume DISTRIBUTION the chain visits, not the mean. eps=1e-4 fluctuates ~10x wider
+than 1e-2, so a floor(1e-2)-vs-ceiling(1e-4) d_s comparison would confound "Regge
+bends to 4" with "looser clamp changes diffusion." ALL THREE now run eps=1e-2 —
+identical everything except --mode/action. Comparability beats canonical-ness here;
+we are placing three runs on one axis, not reproducing AJL.
+
+## Logging is load-bearing and new — verify the FIRST curve
+
+The d_s(sigma) sidecar logging was written this session and smoke-tested once. It is
+now the only thing that produces the ladder result. Before trusting an overnight:
+confirm on the first emitted curve (~sweep 100) that ALL THREE sidecars write the
+full 30-point sigma/d_s array (not a scalar/peak) with 0 NaN/inf. The estimator is
+shaky at tiny N4; an early NaN must be caught now, not tomorrow morning.
+
+## BRACE (pre-registered): floor and ceiling likely DON'T separate at 20k
+
+The floor already reads d_s_peak~2.81 with NO action, and AJL needed N4~181k to see
+the flow bend to 4. So the LIKELY outcome at 20k is floor ~ ceiling (both ~2.4-2.8,
+similar flow shape). If so, the honest finding is: "this machine cannot resolve
+4D-gravity from the expander at feasible volume" — a real, publishable result about
+the instrument's ceiling — and eprl_only's position is UNREADABLE. Do NOT rescue a
+floor~ceiling overlap by comparing eprl_only against one endpoint ("it beat the
+floor!"). Floor-vs-ceiling separation is the GATE; if the gate fails, the ladder has
+no rungs and that overlap IS the answer.
+
 ## Cost / timing
 
 Three runs grown to N4~90–100k = the overnight window, not hours. Collapse (if
