@@ -212,8 +212,8 @@ def load_checkpoint(path):
 
 def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
         seed=0, max_sweeps=20000, measure_every=50, checkpoint=None,
-        strictness=2, wall_budget_s=None, verbose=True, resume=None,
-        extra_hook=None, geometry_action=None, extra_state=None,
+        strictness=2, causal=True, wall_budget_s=None, verbose=True,
+        resume=None, extra_hook=None, geometry_action=None, extra_state=None,
         delta_action=None, audit_every=0, link_check_every=10):
     """Run CDT to `target_N41`, then thermalize, logging d_H + the volume
     profile and checkpointing.
@@ -262,7 +262,8 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
         print(f"# v6 run [{action_label}]  target N41={target_N41}  K={K}  "
               f"(k0={k0}, D={Delta}, k4={k4}, eps={eps})")
         print(f"{'sweep':>6} {'N4':>7} {'N41':>7} {'d_H':>6} {'blob':>6} "
-              f"{'active':>6} {'cos3err':>7} {'valid':>6} {'links':>5} {'wall_s':>8}")
+              f"{'active':>6} {'cos3err':>7} {'valid':>6} {'links':>5} "
+              f"{'slice':>5} {'wall_s':>8}")
 
     for sw in range(1, max_sweeps + 1):
         for _ in range(max(1, T.n_pent())):
@@ -270,7 +271,7 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
             if delta_action is not None:
                 n41_b = T.type_counts()[0]
                 T.begin_record()
-                mt, ok, undo = propose_and_apply(T, rng, strictness)
+                mt, ok, undo = propose_and_apply(T, rng, strictness, causal)
                 if not ok:
                     T.take_record()              # discard (no net change)
                     continue
@@ -287,7 +288,7 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
                     ua, ur = T.take_record()     # the undo's footprint
                     delta_action.reject(T, ua, ur)
             else:
-                mt, ok, undo = propose_and_apply(T, rng, strictness)
+                mt, ok, undo = propose_and_apply(T, rng, strictness, causal)
                 if not ok:
                     continue
                 S_new = action()
@@ -312,6 +313,8 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
             extra_hook(T, rng)
             if delta_action is not None:
                 delta_action.refresh(T)          # heat-bath changed labels
+            elif S is not None:
+                S = action()   # global path: cached S is stale after the hook
         if sw % measure_every == 0:
             ids, adj = dual_adjacency(T)
             dH = hausdorff_dim(adj)
@@ -325,13 +328,16 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
             lf = repv["link_failures"]
             link_s = ("-" if lf is None else "ok" if lf == 0 else
                       "gen" if lf == "unreliable(generalized)" else "BAD")
+            from v6_cdt_moves import causal_slice_report
+            sl_bad, _, sl_ss = causal_slice_report(T)
+            slice_s = "ok" if (sl_bad == 0 and sl_ss == 0) else f"{sl_bad + sl_ss}"
             if verbose:
                 cerr = pm["cos3_relerr"]
                 cerr_s = f"{cerr:>7.3f}" if cerr is not None else f"{'--':>7}"
                 print(f"{sw:>6} {T.n_pent():>7} {T.type_counts()[0]:>7} "
                       f"{dH:>6.2f} {pm['blob_score']:>6.2f} "
                       f"{pm['active_slices']:>6} {cerr_s} "
-                      f"{'ok' if okv else 'BAD':>6} {link_s:>5} "
+                      f"{'ok' if okv else 'BAD':>6} {link_s:>5} {slice_s:>5} "
                       f"{time.time()-t0:>8.0f}", flush=True)
             if not okv:
                 print(f"# !! verify FAILED at sweep {sw}: gluing={repv['gluing']}",
@@ -341,7 +347,8 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
                 save_checkpoint(T, checkpoint,
                                 meta={"sweep": sw, "d_H": dH, "profile": prof,
                                       "profile_metrics": pm,
-                                      "verify_ok": bool(okv), "links": link_s},
+                                      "verify_ok": bool(okv), "links": link_s,
+                                      "slice_defects": int(sl_bad + sl_ss)},
                                 extra=ex)
         if wall_budget_s and time.time() - t0 > wall_budget_s:
             if verbose:
@@ -349,11 +356,18 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
             break
     # FINAL full verification (incl. S^3 vertex links) -- the gate must pass this
     okf, repf = verify(T, check_links=True)
+    from v6_cdt_moves import causal_slice_report
+    sl_bad, sl_hist, sl_ss = causal_slice_report(T)
     T._final_verify = (okf, repf)            # entry points surface this
+    T._final_slices = (sl_bad, sl_hist, sl_ss)
     if verbose:
         ga = repf["gluing"]
         print(f"# FINAL verify: ok={okf}  gluing_ok={repf['ok_gluing_only']}  "
               f"links={repf['link_failures']}  simplicial={ga['is_simplicial']}  "
               f"chi={repf['euler_char']}  n_tets={ga['n_tets']} "
               f"(expect {5*T.n_pent()//2})  connected={ga['connected']}", flush=True)
+        print(f"# FINAL foliation: slice-triangle incidence {sl_hist} "
+              f"(all-2 = closed 3-manifold slices)  same-side tets={sl_ss}  "
+              f"=> {'CLEAN (standard CDT ensemble)' if sl_bad == 0 and sl_ss == 0 else 'DEFECTIVE (generalized ensemble -- see causal_slice_ok)'}",
+              flush=True)
     return T

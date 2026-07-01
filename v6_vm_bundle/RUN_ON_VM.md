@@ -2,8 +2,20 @@
 
 This bundle tests whether the v6 Causal-Dynamical-Triangulations engine generates
 **4-dimensional spacetime** from the graph (the "substrate" / emergence claim),
-first with bare Einstein-Regge dynamics (the known-answer gate) and then with the
-theory's EPRL spin-foam amplitude on top.
+first with bare Einstein-Regge dynamics (the known-answer gate) and then with two
+theory couplings on top: the EPRL spin-foam amplitude (`v6_theory_run.py`) and the
+paper's own admissibility-closure weighting (`v6_closure_run.py`, see
+`CLOSURE_MODEL.md`).
+
+> **ENGINE FIX (2026-07) — re-run the bare scans.** The pre-fix move set did
+> not preserve the CDT foliation: spatial slices drifted off the
+> closed-3-manifold condition (~5% defective triangles; culprit (2,4)/(3,3)
+> moves; see `CLOSURE_MODEL.md` §5). All runs now enforce the foliation by
+> default (`--no-causal-slices` reproduces the old generalized ensemble), the
+> live table has a `slice` column (must read `ok`), and the final line prints a
+> foliation verdict. Old checkpoints heal monotonically on resume, but the
+> bare volume scan below should be REDONE with the fixed engine — prior d_H
+> baselines were measured on the generalized ensemble.
 
 > **Why this is a VOLUME test (and not a strictness test).** We checked locally:
 > at strictness levels 0, 1, and 2 the engine gives *identical* geometry and stays
@@ -22,13 +34,21 @@ theory's EPRL spin-foam amplitude on top.
 * `pip install numpy scipy`  (nothing else — the engine is pure Python/NumPy).
 * A machine with **3+ cores** is ideal (run the volume scan in parallel).
 
-## 1. The bundle (13 files — all required)
+## 1. The bundle
 
 ```
+# engine + harness
 v6_cdt.py  v6_cdt_moves.py  v6_cdt_run.py  v6_run_lib.py
-v6_verify_run.py  v6_theory_run.py
+# runs: bare gate, EPRL coupling, closure coupling
+v6_verify_run.py  v6_theory_run.py  v6_closure_run.py
+run_eprl_sweep.sh  run_closure_sweep.sh  make_shuffled_control.py
+# EPRL vertex + legacy v5 support
+vertex_tensor.py  vertex_j3.npz
 v5_s1xs3_init.py  v5_cdt_link.py  v5_cdt_lib.py  v5_cdt_moves.py
-step3_linkA_harness.py  vertex_tensor.py  vertex_j3.npz
+step3_linkA_harness.py
+# diagnostics + records
+eprl_term_diagnostic.py  centering_beta_audit.py  ds_crosscheck.py
+SIM_AUDIT_coupling_misspecifications.md  CLOSURE_MODEL.md  VERTEX_PROVENANCE.md
 ```
 
 Unzip into one directory and `cd` into it. Quick smoke test (≈30 s):
@@ -162,7 +182,31 @@ grep -hE 'mu TI|centering|audit ok|Traceback|BAD' logs/thy_b*_20k.log | tail -n 
 
 ---
 
-## 4. Rough sizing
+## 4. THE CLOSURE TEST — the paper's own weighting (recommended primary)
+
+The paper's stated selection principle is admissibility-closure counting on
+the seven-state tetrahedral ensemble — not a spin-foam amplitude. This
+coupling implements exactly that (positive weight, no sign problem, no
+external tensors; the run startup re-derives the paper's ⟨K²⟩ = 3/(2η\*) and
+g_share,eff = 7.4198 from the spec as a fidelity gate). Model, forks, and
+gates: `CLOSURE_MODEL.md`.
+
+```bash
+# needs a CLEAN bare checkpoint from the FIXED engine (step 2 rerun):
+BASE=scan_20k.json ./run_closure_sweep.sh "0.0 0.3 1.0" 20000
+# beta=1 is the theory point; a placebo arm (orbit-shuffled energies) runs
+# automatically at the top beta. Watch:
+grep -hE 'mu TI|centering|audit ok|foliation|Traceback|BAD' logs/clo_*_20k.log | tail -n 30
+```
+
+Read: foliation CLEAN on every arm → matched N4 → then d_H / blob / cos³ of
+the β=1 arm against the β=0 control AND the β=1 placebo. Only a
+real-vs-placebo difference is closure physics.
+
+
+---
+
+## 5. Rough sizing
 
 Pure-Python, single-threaded. The prior v6 run reached N_4≈6400 in ~30 min.
 Expect roughly: 10k in ~1-2 h, 20k in a few h, 40k in many h. The literature's

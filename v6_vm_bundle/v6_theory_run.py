@@ -185,9 +185,10 @@ class Centering:
     call -- uniform-random on a fresh/bare-resumed run) is kept only as a loud
     fallback: it is NOT volume-neutral (measured -2.5/pentachoron drift, see
     SIM_AUDIT_coupling_misspecifications.md finding 1)."""
-    def __init__(self, enabled=True, mu_fixed=None):
+    def __init__(self, enabled=True, mu_fixed=None, label="EPRL"):
         self.enabled = enabled
         self.mu_fixed = mu_fixed
+        self.label = label
         self.mu = None                      # set once by calibrate()
 
     def value(self):
@@ -202,13 +203,13 @@ class Centering:
             return
         if self.mu_fixed is not None:
             self.mu = float(self.mu_fixed)
-            print(f"# [EPRL centering] mu = {self.mu:.4f} per pentachoron "
+            print(f"# [{self.label} centering] mu = {self.mu:.4f} per cell "
                   f"(fixed; free-energy calibrated => volume-neutral, keep k4 "
                   f"at the bare value)", flush=True)
         else:
             costs = list(raw_costs)
             self.mu = (sum(costs) / len(costs)) if costs else 0.0
-            print(f"# [EPRL centering] !! LEGACY auto-calibration: mu = "
+            print(f"# [{self.label} centering] !! LEGACY auto-calibration: mu = "
                   f"{self.mu:.4f} = mean cost at the FIRST action evaluation. "
                   f"This is NOT volume-neutral (audit finding 1) -- pass "
                   f"--eprl-mu or let the driver run the thermodynamic-"
@@ -521,6 +522,11 @@ def main():
                         "invariant under the engine's arbitrary face ordering "
                         "(audit finding 4). --no-symmetrize-vertex restores the "
                         "raw tensor (convention-noise, comparison only).")
+    p.add_argument("--causal-slices", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="enforce the CDT foliation (slices stay closed "
+                        "3-manifolds; standard AJL ensemble). --no-causal-slices "
+                        "reproduces the pre-fix generalized ensemble.")
     p.add_argument("--target-n41", type=int, default=4000)
     p.add_argument("--K", type=int, default=24)
     p.add_argument("--k0", type=float, default=2.2)
@@ -608,6 +614,7 @@ def main():
                   seed=args.seed, max_sweeps=args.max_sweeps,
                   measure_every=args.measure_every, checkpoint=args.checkpoint,
                   resume=args.resume, extra_state=intw,
+                  causal=args.causal_slices,
                   wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
 
     heatbath = make_heatbath(intw, Ttensor, beta=beta_eff)

@@ -69,6 +69,90 @@ def strictness_ok(T, new_pids, level=2):
     return True
 
 
+def causal_slice_ok(T, new_pids):
+    """Foliation guard (2026-07 fix): the bare move set preserves the 4D
+    manifold conditions but NOT the CDT foliation -- e.g. a (2,4) on a
+    (2,2)-interface tetrahedron with both apexes at the same time creates a
+    spatial tetrahedron whose two incident pentachora point the SAME way in
+    time, pinching the spatial slice (measured: ~5% of slice triangles off the
+    closed-3-manifold condition in long runs). Standard CDT (AJL) requires
+    every move to act on each slice as a 3D Pachner move, i.e. the slices stay
+    closed simplicial 3-manifolds.
+
+    Checked on the new pentachora (complete: a spatial triangle's incidence
+    can only change if its link circle -- the pentachora containing it -- was
+    edited, so every affected triangle is a sub-simplex of some new
+    pentachoron):
+      * every spatial triangle (3 equal-time vertices) of a new pentachoron
+        lies in exactly TWO spatial tetrahedra of its slice, and
+      * each of those tetrahedra has one apex at t+1 and one at t-1
+        (one future, one past -- the slice is an interface, never a fold).
+
+    Rejecting violating proposals restricts the chain to the standard causal
+    ensemble (detailed balance is unaffected, exactly as with strictness_ok).
+    """
+    K = T.K
+    for pid in new_pids:
+        if pid not in T.pent:
+            continue
+        vs = T.pent[pid]
+        for tri in combinations(vs, 3):
+            t = T.vtime[tri[0]]
+            if T.vtime[tri[1]] != t or T.vtime[tri[2]] != t:
+                continue                      # not a spatial triangle
+            # pentachora whose vertex set contains the triangle = its link ring
+            common = set(T.vinc[tri[0]])
+            common &= T.vinc[tri[1]]
+            common &= T.vinc[tri[2]]
+            # spatial tetrahedra of slice t containing the triangle
+            tets = set()
+            for q in common:
+                same = [v for v in T.pent[q] if T.vtime[v] == t]
+                if len(same) == 4 and set(tri) <= set(same):
+                    tets.add(frozenset(same))
+            if len(tets) != 2:
+                return False
+            up, dn = (t + 1) % K, (t - 1) % K
+            for tet in tets:
+                apex_t = []
+                for q in common:
+                    qv = T.pent[q]
+                    if tet <= set(qv):
+                        rest = [v for v in qv if v not in tet]
+                        if len(rest) == 1:
+                            apex_t.append(T.vtime[rest[0]])
+                if len(apex_t) != 2 or set(apex_t) != {up, dn}:
+                    return False
+    return True
+
+
+def causal_slice_report(T):
+    """Global scan of the foliation condition (for tests / gate checks).
+    Returns (n_bad_triangles, incidence_histogram, n_same_side_tets)."""
+    from collections import defaultdict, Counter
+    tet_pents = defaultdict(list)             # spatial tet -> [(pid, apex_time)]
+    for p, vs in T.pent.items():
+        ts = [T.vtime[v] for v in vs]
+        c = Counter(ts)
+        if sorted(c.values()) == [1, 4]:
+            t4 = max(c, key=c.get)
+            tet = frozenset(v for v in vs if T.vtime[v] == t4)
+            apex = next(v for v in vs if T.vtime[v] != t4)
+            tet_pents[tet].append((p, T.vtime[apex]))
+    tri_inc = defaultdict(int)
+    same_side = 0
+    for tet, ps in tet_pents.items():
+        t4 = T.vtime[next(iter(tet))]
+        want = {(t4 + 1) % T.K, (t4 - 1) % T.K}
+        if len(ps) != 2 or {a for _, a in ps} != want:
+            same_side += 1
+        for tri in combinations(sorted(tet), 3):
+            tri_inc[frozenset(tri)] += 1
+    hist = Counter(tri_inc.values())
+    n_bad = sum(v for k, v in hist.items() if k != 2)
+    return n_bad, dict(sorted(hist.items())), same_side
+
+
 def has_subsimplex(T, verts):
     """True if some single pentachoron contains all of `verts` (i.e. that
     sub-simplex already exists in the complex)."""
