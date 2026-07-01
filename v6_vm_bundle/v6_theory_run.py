@@ -2,12 +2,38 @@
 """WITH-THEORY run: v6 4D CDT geometry coupled to the theory's EPRL / closure
 spin-foam amplitude.
 
-This is the ACTUAL theory test. Each tetrahedron (a shared tetrahedral face
-between two pentachora, in the v6 gluing representation) carries an intertwiner
-label; each pentachoron (4-simplex) contributes the rank-5 vertex tensor
-T[i_0,...,i_4] on its five tetrahedral faces; the EPRL action is
-  S_EPRL = -sum_pentachora log|T[face intertwiners]|.
-Intertwiners are updated by a heat-bath between geometry sweeps.
+MODEL SPEC (fixed 2026-07 -- see SIM_AUDIT_coupling_misspecifications.md).
+The sampled object is the JOINT Gibbs measure over (geometry g, labels i):
+
+    pi(g, i)  propto  exp( -S_Regge(g) - eps*(N41-target)^2
+                           - beta * sum_p [ c_p(i) - mu ] )
+
+with per-pentachoron cost c_p(i) = -log|T_sym[i_faces(p)]| and each
+tetrahedron's intertwiner label carrying UNIFORM BASE MEASURE 1/D (the
+per-tet-normalized label sum). Three consequences worth stating explicitly:
+
+  * beta = 0 recovers bare CDT EXACTLY (the label entropy D^{N_tet} cancels
+    against the normalized base measure), so the control arm is faithful.
+  * Uniform label births at geometry moves are EXACTLY detailed-balanced under
+    this measure -- the D^{+-Delta_tets} proposal factors cancel against the
+    base measure. No Hastings label correction is needed or applied.
+  * The label heat-bath must use the SAME exponent beta as the geometry action
+    (it does now; the pre-fix code ran it at beta=1 for every beta).
+
+CENTERING (mu): the volume-neutral constant is the per-pentachoron label FREE
+ENERGY, mu(beta) = -(1/(beta*N4)) log E_{i~unif}[exp(-beta*sum_p c_p)], NOT the
+mean cost under any single label ensemble. It is computed once per run by
+thermodynamic integration mu = (1/beta) int_0^beta <c_bar>_s ds on the starting
+geometry (annealed heat-bath over an s-grid), stored in the checkpoint, and
+reused on resume. This removes the trivial cosmological-constant shift so k4
+stays at its bare value across the whole beta sweep.
+
+VERTEX TENSOR: the raw tensor is strongly slot-asymmetric while the engine's
+face ordering is an arbitrary internal convention, so by default the tensor is
+SLOT-SYMMETRIZED (mean over the 120 slot permutations) -- the coupled amplitude
+is then a well-defined, ordering-invariant function of the labelled geometry.
+(--no-symmetrize-vertex restores the raw tensor for comparison; its slot
+assignment is convention-noise, measured order-unity.)
 
 TWO COUPLING MODES (the key fix -- replacing Regge is the riskier test):
   * --mode regge_plus_eprl  (DEFAULT, the safer first real test):
@@ -16,7 +42,7 @@ TWO COUPLING MODES (the key fix -- replacing Regge is the riskier test):
     amplitude is a *correction* whose strength is beta_eprl. Turn beta_eprl up
     from ~0 and watch whether the amplitude steers d_H / the volume profile.
   * --mode eprl_only:
-        S_geom = S_EPRL
+        S_geom = S_EPRL      (label exponent and mu use beta_eff = 1)
     Pure amplitude geometry (no Regge). Only interpretable once the amplitude
     fidelity is validated.
 
@@ -24,18 +50,21 @@ TWO COUPLING MODES (the key fix -- replacing Regge is the riskier test):
   1. RUN v6_verify_run.py FIRST. If the bare engine does NOT reproduce 4D CDT
      (d_H -> ~4, de Sitter blob), a result here is uninterpretable -- you cannot
      tell tool artefact from theory. Bare verification is the gate.
-  2. AMPLITUDE FIDELITY: this loads vertex_j3.npz (the frozen-j=3 vertex tensor).
-     Until the full five-tetrahedron {15j} contraction is convention-checked,
-     ABSOLUTE d_H / d_s numbers are ARTEFACT-grade. What IS robust
-     (finite-size-cancelling) is the COMPARISON at matched volume: bare vs
-     regge_plus_eprl (sweep beta_eprl) -- does the amplitude move the geometry?
-  3. DETAILED BALANCE: tetrahedra created by a geometry move get a fresh
-     intertwiner (uniform), not folded into the Hastings ratio. Adequate for the
-     steer-direction comparison; not for precision sampling. The heat-bath
-     re-equilibrates labels each sweep.
+  2. AMPLITUDE FIDELITY: this loads vertex_j3.npz (the frozen-j=3 vertex
+     tensor), positivized (|A|) and slot-symmetrized. That object is a
+     PLACEHOLDER for the EPRL amplitude, not the EPRL amplitude: the {15j}
+     gluing convention is unchecked, and the true intertwiner contraction has
+     order-unity sign interference that |A| discards (median per-edge coherence
+     0.44). ABSOLUTE numbers are artefact-grade; only matched-volume
+     comparisons are meaningful.
+  3. PLACEBO ARM IS MANDATORY: rerun the top beta with an entry-shuffled tensor
+     (make_shuffled_control.py). Only a real-vs-shuffled DIFFERENCE at matched
+     beta is attributable to the amplitude's structure. (Pre-fix, the shuffled
+     placebo reproduced the entire visible "steer".)
   4. kappa_4 = 0.9 is a STARTING GUESS in our conventions, not gospel. If N_41
      runs away or freezes, retune kappa_4 (and/or eps) -- the volume penalty is
-     the real anchor; kappa_4 only sets the pseudo-critical baseline.
+     the real anchor; kappa_4 only sets the pseudo-critical baseline. Gate
+     matched volume on N4 (both types), not just the pinned N41.
 
 USAGE (after verification passes):
   # additive correction (safe first test), global O(N) action:
@@ -67,6 +96,8 @@ class Intertwiners:
         self.D = D
         self.rng = rng
         self.lab = {}
+        self.mu_saved = None      # centering constant, carried through checkpoints
+        self.mu_ctx = None        # what mu was calibrated FOR (beta/tensor/symm)
         if T is not None:
             self.sync(T)
 
@@ -108,11 +139,18 @@ class Intertwiners:
         for k, c in self.lab.items():
             p, q = sorted(k)
             out.append([p, q, int(c)])
-        return {"D": int(self.D), "lab": out}
+        d = {"D": int(self.D), "lab": out}
+        if self.mu_saved is not None:
+            d["mu"] = float(self.mu_saved)   # so a resume reuses the SAME mu
+            if self.mu_ctx is not None:
+                d["mu_ctx"] = dict(self.mu_ctx)
+        return d
 
     def load(self, d):
         """Restore labels from a serialize() payload. Pids are preserved by the
-        geometry checkpoint, so the frozenset keys remain valid."""
+        geometry checkpoint, so the frozenset keys remain valid. NOTE: does not
+        touch mu_saved -- the driver resolves mu (CLI > checkpoint > TI) before
+        the run starts and load() must not clobber that decision."""
         self.D = int(d["D"])
         self.lab = {frozenset((int(a), int(b))): int(c) for a, b, c in d["lab"]}
 
@@ -123,18 +161,30 @@ class Intertwiners:
 
 class Centering:
     """The raw EPRL action S_EPRL = sum_p (-log|amp_p|) is EXTENSIVE: its bulk is
-    just (mean per-pentachoron cost) * N4, i.e. a renormalization of kappa_4 (the
-    cosmological constant). That trivial piece collapses/inflates the universe and
-    is normalization-dependent (artefact-grade for the frozen-j3 tensor) -- it is
-    NOT the physics. Subtracting a fixed reference mu per pentachoron,
+    a renormalization of kappa_4 (the cosmological constant). That trivial piece
+    collapses/inflates the universe and is normalization-dependent
+    (artefact-grade for the frozen-j3 tensor) -- it is NOT the physics.
+    Subtracting a fixed reference mu per pentachoron,
 
         S_EPRL -> sum_p (-log|amp_p| - mu),
 
-    leaves only the FLUCTUATIONS of the amplitude across configurations -- the
-    part that can actually steer geometry SHAPE -- and makes the term
-    volume-neutral, so kappa_4 stays at its bare value across the whole beta
-    sweep (no per-beta retuning). mu is auto-calibrated once from the starting
-    configuration (or fixed via --eprl-mu)."""
+    leaves only the FLUCTUATIONS of the amplitude across configurations and
+    makes the term volume-neutral, so kappa_4 stays at its bare value across
+    the whole beta sweep (no per-beta retuning).
+
+    WHAT mu MUST BE (audit fix): the geometry-marginal weight of a pentachoron
+    is the label FREE ENERGY, not the mean cost under any one label ensemble.
+    Volume-neutrality requires
+
+        mu(beta) = -(1/(beta*N4)) * log E_{labels~uniform}[exp(-beta*sum_p c_p)]
+                 = (1/beta) * int_0^beta <c_bar>_s ds ,
+
+    computed by calibrate_mu_ti() (thermodynamic integration, annealed
+    heat-bath) and passed in as mu_fixed. The legacy first-evaluation
+    auto-calibration (mean cost of whatever labels exist at the first action
+    call -- uniform-random on a fresh/bare-resumed run) is kept only as a loud
+    fallback: it is NOT volume-neutral (measured -2.5/pentachoron drift, see
+    SIM_AUDIT_coupling_misspecifications.md finding 1)."""
     def __init__(self, enabled=True, mu_fixed=None):
         self.enabled = enabled
         self.mu_fixed = mu_fixed
@@ -152,13 +202,17 @@ class Centering:
             return
         if self.mu_fixed is not None:
             self.mu = float(self.mu_fixed)
+            print(f"# [EPRL centering] mu = {self.mu:.4f} per pentachoron "
+                  f"(fixed; free-energy calibrated => volume-neutral, keep k4 "
+                  f"at the bare value)", flush=True)
         else:
             costs = list(raw_costs)
             self.mu = (sum(costs) / len(costs)) if costs else 0.0
-        print(f"# [EPRL centering] mu = {self.mu:.4f} per pentachoron "
-              f"({'fixed' if self.mu_fixed is not None else 'auto-calibrated'}); "
-              f"EPRL term now measures fluctuations about the mean "
-              f"(volume-neutral -- keep k4 at the bare value)", flush=True)
+            print(f"# [EPRL centering] !! LEGACY auto-calibration: mu = "
+                  f"{self.mu:.4f} = mean cost at the FIRST action evaluation. "
+                  f"This is NOT volume-neutral (audit finding 1) -- pass "
+                  f"--eprl-mu or let the driver run the thermodynamic-"
+                  f"integration calibration instead.", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -194,30 +248,109 @@ def make_geometry_action(mode, intw, Ttensor, k0, Delta, k4, beta_eprl, centerin
     raise ValueError(f"unknown mode {mode!r}")
 
 
-def make_heatbath(intw, Ttensor):
-    """One heat-bath pass: resample each tet's intertwiner conditional on the two
-    pentachora that share it. (Equilibrates labels between geometry sweeps.)"""
-    D = intw.D
+def slot_symmetrize(Ttensor):
+    """Mean of the tensor over the 120 slot permutations. The raw sl2cfoam
+    tensor is strongly slot-asymmetric (adjacent-swap rel. asymmetry ~1.2)
+    while the engine's face ordering is an arbitrary internal convention --
+    contracting the raw tensor against it is convention-noise (audit finding
+    4). The symmetrized tensor is ordering-invariant, so the coupled amplitude
+    is a well-defined function of the labelled geometry. (Checked on
+    vertex_j3.npz: keeps the same max|A|, ~half the norm, no zeros, cost std
+    1.32 -- the term keeps its teeth.)"""
+    from itertools import permutations
+    S = np.zeros_like(Ttensor)
+    for perm in permutations(range(5)):
+        S += np.transpose(Ttensor, perm)
+    return S / 120.0
 
+
+def _heatbath_pass(T, intw, Ttensor, expo, rng):
+    """One full heat-bath pass at label exponent `expo`: resample each tet's
+    intertwiner from its exact conditional prod_{p in tet} |A_p|^expo under the
+    joint measure. expo MUST equal the beta multiplying S_EPRL in the geometry
+    action (audit finding 2: the pre-fix code hardcoded expo=1)."""
+    D = intw.D
+    for key in list(intw.lab.keys()):
+        ps = [p for p in key if p in T.pent]
+        if len(ps) != 2:
+            continue
+        logw = np.zeros(D)
+        old = intw.lab[key]
+        for c in range(D):
+            intw.lab[key] = c
+            lw = 0.0
+            for p in ps:
+                amp = abs(Ttensor[intw.faces(T, p)])
+                lw += np.log(amp if amp > 1e-300 else 1e-300)
+            logw[c] = expo * lw
+        logw -= logw.max()
+        w = np.exp(logw); tot = w.sum()
+        intw.lab[key] = old if tot < 1e-300 else int(rng.choice(D, p=w / tot))
+
+
+def make_heatbath(intw, Ttensor, beta=1.0):
+    """Per-sweep heat-bath hook at the run's label exponent beta (= beta_eprl
+    in regge_plus_eprl mode, 1.0 in eprl_only mode). At beta=0 this correctly
+    degenerates to uniform resampling."""
     def hook(T, rng):
         intw.sync(T)
-        for key in list(intw.lab.keys()):
-            ps = [p for p in key if p in T.pent]
-            if len(ps) != 2:
-                continue
-            logw = np.zeros(D)
-            old = intw.lab[key]
-            for c in range(D):
-                intw.lab[key] = c
-                lw = 0.0
-                for p in ps:
-                    amp = abs(Ttensor[intw.faces(T, p)])
-                    lw += np.log(amp if amp > 1e-300 else 1e-300)
-                logw[c] = lw
-            logw -= logw.max()
-            w = np.exp(logw); tot = w.sum()
-            intw.lab[key] = old if tot < 1e-300 else int(rng.choice(D, p=w / tot))
+        _heatbath_pass(T, intw, Ttensor, beta, rng)
     return hook
+
+
+def _mean_cost(T, intw, Ttensor):
+    """Mean per-pentachoron cost -log|A| at the current labels."""
+    tot = 0.0
+    n = 0
+    for p in T.pent:
+        amp = abs(Ttensor[intw.faces(T, p)])
+        tot += -np.log(amp if amp > 1e-300 else 1e-300)
+        n += 1
+    return tot / max(1, n)
+
+
+def calibrate_mu_ti(T, Ttensor, beta, D, seed, n_points=6, equil=3, measure=2,
+                    verbose=True):
+    """Volume-neutral centering constant by thermodynamic integration:
+
+        mu(beta) = (1/beta) * int_0^beta <c_bar>_s ds ,
+
+    the per-pentachoron label FREE ENERGY of the starting geometry (see
+    Centering docstring). <c_bar>_s is measured with the exact heat-bath at
+    exponent s, annealed upward over an (n_points+1)-point grid from s=0
+    (uniform labels) to s=beta; the integral is a trapezoid rule. Runs on a
+    FIXED geometry -- labels only -- so it is cheap (a few dozen heat-bath
+    passes) and deterministic given the seed.
+
+    At beta<=0 returns the uniform-label mean cost (the beta->0 limit; the
+    term is zero at beta=0 anyway)."""
+    rng = np.random.default_rng(seed)
+    intw = Intertwiners(T, D, rng)          # fresh uniform labels
+    if beta <= 0:
+        return _mean_cost(T, intw, Ttensor)
+    ss = np.linspace(0.0, float(beta), int(n_points) + 1)
+    fs = []
+    if verbose:
+        print(f"# [mu TI] calibrating volume-neutral mu on the starting "
+              f"geometry (N4={T.n_pent()}): {n_points + 1} grid points x "
+              f"{equil}+{measure} heat-bath passes", flush=True)
+    for k, s in enumerate(ss):
+        for _ in range(int(equil)):
+            _heatbath_pass(T, intw, Ttensor, s, rng)
+        acc = []
+        for _ in range(int(measure)):
+            _heatbath_pass(T, intw, Ttensor, s, rng)
+            acc.append(_mean_cost(T, intw, Ttensor))
+        fs.append(sum(acc) / len(acc))
+        if verbose:
+            print(f"# [mu TI]   s={s:.4f}  <c_bar>_s = {fs[-1]:.4f}", flush=True)
+    mu = float(np.trapezoid(fs, ss) / beta) if hasattr(np, "trapezoid") \
+        else float(np.trapz(fs, ss) / beta)
+    if verbose:
+        print(f"# [mu TI] mu({beta}) = {mu:.4f}  (vs uniform-mean {fs[0]:.4f}, "
+              f"equilibrated-mean {fs[-1]:.4f} -- mu is the free energy, "
+              f"between the two)", flush=True)
+    return mu
 
 
 # ---------------------------------------------------------------------------
@@ -361,14 +494,33 @@ def main():
                         "N sweeps (0 disables; aborts on drift)")
     p.add_argument("--center-eprl", action=argparse.BooleanOptionalAction,
                    default=True,
-                   help="subtract the mean per-pentachoron EPRL cost so the "
-                        "amplitude term is volume-neutral (removes the trivial "
-                        "cosmological-constant shift). Keep --k4 at the bare value "
-                        "across the whole beta sweep. Use --no-center-eprl for the "
-                        "raw extensive action (then retune --k4 per beta).")
+                   help="subtract the per-pentachoron label free energy mu so "
+                        "the amplitude term is volume-neutral (removes the "
+                        "trivial cosmological-constant shift). Keep --k4 at the "
+                        "bare value across the whole beta sweep. Use "
+                        "--no-center-eprl for the raw extensive action (then "
+                        "retune --k4 per beta).")
     p.add_argument("--eprl-mu", type=float, default=None,
                    help="fixed centering constant mu per pentachoron; default "
-                        "auto-calibrates from the starting configuration")
+                        "computes the free-energy value by thermodynamic "
+                        "integration on the starting configuration (and a "
+                        "resume reuses the mu stored in the checkpoint)")
+    p.add_argument("--recalibrate-mu", action="store_true",
+                   help="ignore a mu stored in the resume checkpoint and rerun "
+                        "the thermodynamic-integration calibration")
+    p.add_argument("--mu-ti-points", type=int, default=6,
+                   help="grid intervals for the mu thermodynamic integration")
+    p.add_argument("--mu-ti-equil", type=int, default=3,
+                   help="heat-bath equilibration passes per TI grid point")
+    p.add_argument("--mu-ti-measure", type=int, default=2,
+                   help="heat-bath measurement passes per TI grid point")
+    p.add_argument("--symmetrize-vertex", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="slot-symmetrize the vertex tensor (mean over the 120 "
+                        "slot permutations) so the coupled amplitude is "
+                        "invariant under the engine's arbitrary face ordering "
+                        "(audit finding 4). --no-symmetrize-vertex restores the "
+                        "raw tensor (convention-noise, comparison only).")
     p.add_argument("--target-n41", type=int, default=4000)
     p.add_argument("--K", type=int, default=24)
     p.add_argument("--k0", type=float, default=2.2)
@@ -388,16 +540,68 @@ def main():
 
     print("!! WITH-THEORY (EPRL) run. Verify the BARE engine first "
           "(v6_verify_run.py). Amplitude is frozen-j3 (artefact-grade absolutes);"
-          " the robust signal is the bare-vs-EPRL comparison at matched volume.")
+          " the robust signal is the bare-vs-EPRL comparison at matched volume,"
+          " read against the shuffled-tensor placebo arm.")
     print(f"   mode={args.mode}  beta_eprl={args.beta_eprl}  "
-          f"local_eprl={args.local_eprl}  center_eprl={args.center_eprl}\n")
+          f"local_eprl={args.local_eprl}  center_eprl={args.center_eprl}  "
+          f"symmetrize_vertex={args.symmetrize_vertex}\n")
 
     from vertex_tensor import FaithfulVertex
     Ttensor = FaithfulVertex.load(args.vertex).dense_tensor().astype(np.float64)
+    if args.symmetrize_vertex:
+        Ttensor = slot_symmetrize(Ttensor)
+        print(f"# [vertex] slot-symmetrized: max|A|={np.abs(Ttensor).max():.3e}, "
+              f"cost mean/std = "
+              f"{(-np.log(np.abs(Ttensor).clip(1e-300))).mean():.2f}/"
+              f"{(-np.log(np.abs(Ttensor).clip(1e-300))).std():.2f}", flush=True)
     D = Ttensor.shape[0]
     rng = np.random.default_rng(args.seed)
     intw = Intertwiners(None, D, rng)             # labels filled lazily on first T
-    centering = Centering(enabled=args.center_eprl, mu_fixed=args.eprl_mu)
+
+    # label exponent = the beta actually multiplying S_EPRL in the action
+    beta_eff = args.beta_eprl if args.mode == "regge_plus_eprl" else 1.0
+
+    # --- resolve the centering constant mu (audit findings 1+2) -------------
+    # priority: --eprl-mu  >  matching mu stored in the resume ckpt  >  TI calib.
+    # "matching" = same beta_eff, same tensor (fingerprint), same symmetrize
+    # flag: a mu calibrated for another arm's beta or for a different tensor
+    # (e.g. the shuffled placebo) is NOT volume-neutral for this run.
+    import hashlib
+    mu_ctx = {"beta_eff": float(beta_eff),
+              "vertex_sha": hashlib.sha256(Ttensor.tobytes()).hexdigest()[:12],
+              "symm": bool(args.symmetrize_vertex)}
+    mu = args.eprl_mu
+    T0 = None
+    if args.center_eprl and mu is None and args.resume:
+        from v6_run_lib import load_checkpoint
+        T0, _, extra0 = load_checkpoint(args.resume)
+        saved = (extra0 or {}).get("mu") if isinstance(extra0, dict) else None
+        saved_ctx = (extra0 or {}).get("mu_ctx") if isinstance(extra0, dict) else None
+        if saved is not None and not args.recalibrate_mu:
+            if saved_ctx == mu_ctx:
+                mu = float(saved)
+                print(f"# [EPRL centering] reusing mu = {mu:.4f} from the resume "
+                      f"checkpoint (same beta/tensor; pass --recalibrate-mu to "
+                      f"override)", flush=True)
+            else:
+                print(f"# [EPRL centering] checkpoint mu was calibrated for "
+                      f"{saved_ctx} but this run is {mu_ctx} -- recalibrating "
+                      f"(a mismatched mu is not volume-neutral)", flush=True)
+    if args.center_eprl and mu is None:
+        if T0 is None:
+            from v6_cdt import build_s1xs3
+            T0 = build_s1xs3(K=args.K)
+            print("# [mu TI] fresh run: calibrating on the initial (thin) "
+                  "geometry. For production sweeps resume from a thermalized "
+                  "checkpoint so mu is calibrated at the target volume.",
+                  flush=True)
+        mu = calibrate_mu_ti(T0, Ttensor, beta_eff, D, seed=args.seed + 777,
+                             n_points=args.mu_ti_points, equil=args.mu_ti_equil,
+                             measure=args.mu_ti_measure)
+    del T0                                        # run() reloads the checkpoint
+    centering = Centering(enabled=args.center_eprl, mu_fixed=mu)
+    intw.mu_saved = mu                            # persisted with every checkpoint
+    intw.mu_ctx = mu_ctx
 
     common = dict(k0=args.k0, Delta=args.Delta, k4=args.k4,
                   target_N41=args.target_n41, K=args.K, eps=args.eps,
@@ -406,16 +610,15 @@ def main():
                   resume=args.resume, extra_state=intw,
                   wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
 
+    heatbath = make_heatbath(intw, Ttensor, beta=beta_eff)
     if args.local_eprl:
         inc = IncrementalEPRL(intw, Ttensor, args.mode, args.k0, args.Delta,
                               args.k4, args.beta_eprl, rng, centering=centering)
-        heatbath = make_heatbath(intw, Ttensor)
         T = run(f"EPRL [{args.mode}, local]", delta_action=inc,
                 extra_hook=heatbath, audit_every=args.audit_every, **common)
     else:
         geom = make_geometry_action(args.mode, intw, Ttensor, args.k0, args.Delta,
                                     args.k4, args.beta_eprl, centering)
-        heatbath = make_heatbath(intw, Ttensor)
         T = run(f"EPRL [{args.mode}, global]", geometry_action=geom,
                 extra_hook=heatbath, **common)
 

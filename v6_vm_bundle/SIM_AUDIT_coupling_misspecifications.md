@@ -1,5 +1,12 @@
 # Sim audit — where the EPRL coupling is misspecified (2026-07)
 
+> **STATUS: FIXES APPLIED.** Findings 1–4 are fixed in `v6_theory_run.py` /
+> `run_eprl_sweep.sh` (see "Fixes applied" at the bottom of this file, which
+> also corrects one detail of finding 1's original fix recommendation).
+> Finding 5 (sign problem) is inherent to positivized Monte Carlo and is now
+> handled by honest scoping plus the mandatory shuffled placebo arm. This
+> audit text is kept as written for the record of the pre-fix behavior.
+
 Audit of the v6 theory run (`v6_theory_run.py` + `v6_run_lib.py`) prompted by
 the question: *is the matched-volume β-sweep testing what we think it is?*
 Answer: **no — as shipped, the swept signal is dominated by β-dependent
@@ -180,3 +187,91 @@ right than EPRL.
 *Files added with this audit: `centering_beta_audit.py` (findings 1–2),
 `make_shuffled_control.py` (placebo arm). Both run on the shipped bundle
 with no extra dependencies.*
+
+---
+
+# Fixes applied (2026-07, same audit cycle)
+
+**Model spec pinned down first** (this resolves finding 3 exactly): the
+sampled object is now declared to be the joint Gibbs measure
+
+    pi(g, i) ∝ exp(−S_Regge − eps·(N41−target)² − β·Σ_p [c_p(i) − mu])
+
+with each tetrahedron's intertwiner label carrying **uniform base measure
+1/D** (per-tet-normalized label sum). Under this measure: (a) β=0 recovers
+bare CDT *exactly* (label entropy cancels against the base measure), so the
+control arm stays faithful; (b) **uniform label births at geometry moves are
+exactly detailed-balanced** — the D^±Δ proposal factors cancel — so no
+Hastings label correction is needed. The pre-fix "birth bias / ratchet" was
+real, but it was the *interaction* of findings 1+2 with the births, not a
+missing proposal factor. With 1+2 fixed, the joint sampler is exact.
+
+**Finding 2 fix:** `_heatbath_pass(..., expo, ...)` — the label conditional
+now uses the same exponent β as the geometry action (`beta_eff` = β_eprl in
+`regge_plus_eprl` mode, 1.0 in `eprl_only`). At β=0 it degenerates to uniform
+resampling, as it must.
+
+**Finding 1 fix — with a correction to this audit's own recommendation.**
+The original text above says "calibrate mu from label-equilibrated
+configurations". That is *also* wrong, by a smaller margin: volume-neutrality
+requires the extensive part of the geometry-marginal weight to cancel, and
+that marginal is the label **free energy**, not the mean cost under any one
+ensemble:
+
+    mu(β) = −(1/(β·N4)) · log E_{i~uniform}[exp(−β Σ_p c_p)]
+          = (1/β) ∫₀^β ⟨c̄⟩_s ds ,
+
+which lies **between** the uniform mean (correct only as β→0) and the
+β-equilibrated mean (over-subtracts). `calibrate_mu_ti()` computes it by
+thermodynamic integration (annealed heat-bath over an s-grid, trapezoid rule)
+on the starting geometry — for production sweeps that is the thermalized base
+checkpoint, so mu is calibrated at the target volume. The value is stored in
+the run checkpoint and reused on resume (`--recalibrate-mu` to override);
+`--eprl-mu` still takes absolute priority. Residual non-neutrality from
+label–label correlations across pentachora is second-order; the G3' gate
+(matched **N4**, below) is the empirical backstop.
+
+**Finding 4 fix:** the vertex tensor is **slot-symmetrized** by default
+(mean over the 120 slot permutations, `slot_symmetrize()`), making the
+coupled amplitude invariant under the engine's arbitrary face ordering — a
+well-defined function of the labelled geometry. Measured on vertex_j3.npz:
+max|A| unchanged, norm ×0.51, no zeros, cost std 1.32 (still has teeth).
+This is an honest *definition* choice, not a recovery of the true EPRL
+gluing: the {15j} convention check and the (2i+1)/face-amplitude measure
+questions remain open exactly as §4 states, and absolute numbers remain
+artefact-grade. `--no-symmetrize-vertex` restores the raw tensor for
+comparison.
+
+**Finding 5 scoping:** unchanged and unavoidable within Metropolis — the
+object under test is the positivized |A| model, and every claim must say so.
+The protective control is the placebo arm, now built into the sweep script:
+`run_eprl_sweep.sh` auto-generates `vertex_j3_shuffled.npz` and runs it at
+the largest β. **Only a real-vs-shuffled difference at matched β is
+attributable to the amplitude's structure.**
+
+**Protocol changes** (`run_eprl_sweep.sh`, `RUN_ON_VM.md`):
+- G3' gate: matched volume = comparable **N4** (both simplex types) across
+  all arms, not just the pinned N41.
+- Placebo arm mandatory at the top β (PLACEBO=0 to disable, don't).
+- Each arm logs its TI table (`# [mu TI] ...`) at startup for the record.
+
+**Post-fix acceptance test** (same small-volume setup as the placebo table
+above, but all arms resumed from a common β=0 base checkpoint at N41≈2000 and
+run 400 further sweeps; note all arms are still slowly growing N4, so this is
+a machinery check, not an equilibrated measurement):
+
+| arm (post-fix)       | final N4 | d_H  | final blob |
+|----------------------|----------|------|------------|
+| β=0 control          | 3926     | 2.54 | 1.80       |
+| β=0.3, real tensor   | 4088     | 2.64 | 2.20       |
+| β=0.3, shuffled      | 4330     | 2.59 | 2.19       |
+
+The pre-fix signature (real arm displaced ~10% below control in N4 with a
+strongly elevated blob, and the placebo *reproducing* it) is gone: the real
+β=0.3 arm now tracks the control within a few % (it ran at N4 ≈ control
+through sweep 300 and finished +4%), and mid-run mu values / audits behave
+as designed. Residual few-% differences in this short single-seed run are
+within the drift of the still-growing base — the production G3' gate
+(matched N4, thermalized, real seeds) is the binding check, and the shuffled
+arm is now a *reading* (real-vs-placebo difference = EPRL-attributable
+signal) rather than a contamination.

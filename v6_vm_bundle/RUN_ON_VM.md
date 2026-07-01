@@ -108,34 +108,57 @@ If (and only if) the bare gate reaches 4D, run the EPRL amplitude **on top** and
 compare to the bare run **at the same volume**. The robust signal is the
 *difference* (finite-size effects cancel): does the amplitude steer the geometry?
 
+> **Post-audit protocol (2026-07).** The coupling machinery was audited and
+> fixed — see `SIM_AUDIT_coupling_misspecifications.md`. The sampler is now
+> exact for a declared joint measure: β-consistent label heat-bath,
+> free-energy centering (mu via thermodynamic integration, printed as
+> `# [mu TI]` lines and stored in the checkpoint), slot-symmetrized vertex
+> tensor, and a **mandatory shuffled-tensor placebo arm**. Use the sweep
+> script — it wires all of this up:
+
 ```bash
-# matched-volume comparison at, say, N_41 = 20000:
-#  (a) bare reference is scan_20k.json from step 2.
-#  (b) Regge + a small EPRL correction (safer first test), fast local action:
-nohup python -u v6_theory_run.py --mode regge_plus_eprl --beta-eprl 0.1 \
-      --local-eprl --audit-every 25 --target-n41 20000 --K 80 \
-      --checkpoint thy_b0.1_20k.json > thy_b0.1_20k.log 2>&1 &
+# from the bundle directory, with the bare checkpoint from step 2 available:
+BASE=scan_20k.json ./run_eprl_sweep.sh "0.0 0.05 0.1 0.3" 20000
+# watch:
+tail -n 4 logs/thy_b*_20k.log
+grep -hE 'mu TI|centering|audit ok|Traceback|BAD' logs/thy_b*_20k.log | tail -n 30
 ```
 
-* `--mode regge_plus_eprl` adds `beta_eprl * S_EPRL` to the Regge action (safe).
-  Sweep `--beta-eprl` 0.0 → 0.1 → 0.3 → 1.0 and watch d_H / blob / cos3err move.
-* `--local-eprl` uses the O(footprint) incremental action; `--audit-every 25`
-  recomputes from scratch every 25 sweeps and **aborts on any drift** (safety net).
-  Drop `--local-eprl` to use the simple global O(N) action as a cross-check.
-* `--mode eprl_only` replaces Regge entirely (only interpretable once the amplitude
-  fidelity is validated — see the caveats printed at startup).
+* Each arm resumes from the SAME thermalized bare checkpoint, pins the same
+  N41, calibrates its own mu (a few minutes of heat-bath passes at startup),
+  and runs with `--local-eprl --audit-every 25` (recompute-and-abort-on-drift
+  safety net).
+* The placebo arm (`thy_b0.3shuf_20k`) runs the largest β with an
+  entry-shuffled tensor (`make_shuffled_control.py`): same entry statistics,
+  all EPRL structure destroyed.
+
+### How to read it (gates BEFORE observables)
+
+1. **G3′ — matched N4.** All arms must sit at comparable **N4** (not just the
+   pinned N41). If N4 trends with β, the term is not volume-neutral — stop
+   and investigate; do not read d_H.
+2. **Placebo separation.** Compare the real β_max arm to the shuffled arm.
+   Only a real-vs-shuffled **difference** is attributable to the EPRL
+   amplitude's structure; if they match, the movement (or the flatness) is
+   machinery/entry-statistics, not EPRL.
+3. Then read d_H / blob / cos3err vs β against the bare run, as before.
 
 ### Honest caveats (printed by the theory run, repeated here)
 
-1. The vertex amplitude is the **frozen-j=3** tensor (`vertex_j3.npz`); the full
-   {15j} contraction still needs convention-checking, so **absolute** d_H from the
-   theory run is artefact-grade. What's robust is the **bare-vs-EPRL comparison at
-   matched volume**.
-2. New tetrahedra get a fresh (uniform) intertwiner not folded into the Hastings
-   ratio; the per-sweep heat-bath re-equilibrates labels. Fine for the
-   steer-direction comparison, not for precision sampling.
-3. `--k4 0.9` is a starting guess in our conventions. If N_41 runs away or freezes,
-   retune `--k4` (and/or `--eps`); the volume penalty is the real anchor.
+1. The vertex amplitude is the **frozen-j=3** tensor (`vertex_j3.npz`),
+   positivized (|A| — the true intertwiner contraction has order-unity sign
+   interference) and slot-symmetrized (the raw tensor's slot order is an
+   unchecked convention). It is a PLACEHOLDER for the EPRL amplitude;
+   **absolute** numbers are artefact-grade. What's meaningful is the
+   matched-volume comparison read against the placebo.
+2. A frozen-j amplitude has no area degrees of freedom (all triangles carry
+   the same spin), so it cannot feel deficit angles; the measured intertwiner
+   variance is type-blind. A flat sweep is therefore expected for structural
+   reasons and does NOT vindicate or falsify the theory (see the audit doc's
+   frozen-j vs peaked-j section).
+3. `--k4 0.9` is a starting guess in our conventions. If N_41 runs away or
+   freezes, retune `--k4` (and/or `--eps`); the volume penalty is the real
+   anchor.
 
 ---
 
