@@ -24,7 +24,7 @@ from itertools import combinations
 from v6_cdt import build_s1xs3, verify, regge_action
 from v6_cdt_moves import (
     apply_24, apply_42, apply_28, apply_82, apply_33, apply_46, apply_64,
-    strictness_ok,
+    strictness_ok, causal_slice_ok,
 )
 
 MOVES = ["(2,4)", "(4,2)", "(2,8)", "(8,2)", "(3,3)", "(4,6)", "(6,4)"]
@@ -60,12 +60,19 @@ def hastings_log(mt, N4, N0):
     return 0.0  # (3,3)
 
 
-def propose_and_apply(T, rng, strictness=2):
+def propose_and_apply(T, rng, strictness=2, causal=True):
     """Pick a uniform move type + a random target, apply it, and return
     (move_label, ok, undo). A move that would create a degenerate (non-strict)
     configuration is undone and reported as ok=False -- so the chain stays on the
     strict (non-branched) ensemble (detailed balance is unaffected: the proposal
-    distribution is unchanged; strictness only forbids entering degenerate states)."""
+    distribution is unchanged; strictness only forbids entering degenerate states).
+
+    `causal=True` (default, 2026-07 fix) additionally rejects moves that break
+    the CDT foliation (spatial slices must remain closed simplicial 3-manifolds
+    with every spatial tetrahedron an interface between one future and one past
+    pentachoron -- see causal_slice_ok). The pre-fix ensemble (causal=False)
+    develops slice defects through (2,4)/(3,3) moves and is NOT the standard
+    CDT ensemble of the literature."""
     mt = MOVES[rng.integers(len(MOVES))]
     P = T.pent_bag.pick(rng)        # O(1) random pentachoron
     vs = T.pent[P]
@@ -128,6 +135,9 @@ def propose_and_apply(T, rng, strictness=2):
         return mt, False, None
     if not strictness_ok(T, news, strictness):
         undo()                       # would create a degenerate config -> reject
+        return mt, False, None
+    if causal and not causal_slice_ok(T, news):
+        undo()                       # would break the foliation -> reject
         return mt, False, None
     return mt, True, undo
 

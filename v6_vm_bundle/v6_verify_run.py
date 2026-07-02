@@ -45,12 +45,18 @@ def main():
     p.add_argument("--checkpoint", type=str, default="v6_verify_ckpt.json")
     p.add_argument("--resume", type=str, default=None)
     p.add_argument("--wall-hours", type=float, default=None, help="stop after this many hours")
+    p.add_argument("--causal-slices", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="enforce the CDT foliation (slices stay closed 3-manifolds; "
+                        "standard AJL ensemble). --no-causal-slices reproduces the "
+                        "pre-fix generalized ensemble.")
     args = p.parse_args()
 
     T = run("bare-Regge (verification)", k0=args.k0, Delta=args.Delta, k4=args.k4,
             target_N41=args.target_n41, K=args.K, eps=args.eps, seed=args.seed,
             max_sweeps=args.max_sweeps, measure_every=args.measure_every,
             checkpoint=args.checkpoint, resume=args.resume,
+            causal=args.causal_slices,
             wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
 
     # final verdict

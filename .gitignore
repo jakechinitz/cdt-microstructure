@@ -7,3 +7,8 @@ __pycache__/
 v6_verify_ckpt.json
 scan_*.json
 thy_*.json
+
+# derived placebo tensor (regenerate with make_shuffled_control.py)
+vertex_j3_shuffled.npz
+logs/
+results/

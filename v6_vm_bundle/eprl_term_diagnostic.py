@@ -50,11 +50,22 @@ def main():
     ap.add_argument("--K", type=int, default=16)
     ap.add_argument("--grow", type=int, default=8000, help="proposal attempts to grow/thermalize geometry")
     ap.add_argument("--hb", type=int, default=15, help="heat-bath passes to equilibrate labels")
+    ap.add_argument("--hb-beta", type=float, default=1.0,
+                    help="label exponent for the heat-bath. Use the run's "
+                         "beta_eprl to see the term at that coupling (the "
+                         "production heat-bath is now beta-consistent).")
+    ap.add_argument("--symmetrize", action="store_true",
+                    help="slot-symmetrize the tensor first (matches the "
+                         "production default in v6_theory_run.py)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--betas", default="0.05 0.1 0.3")
     args = ap.parse_args()
 
     Tt = FaithfulVertex.load(args.vertex).dense_tensor().astype(np.float64)
+    if args.symmetrize:
+        from v6_theory_run import slot_symmetrize
+        Tt = slot_symmetrize(Tt)
+        print("[tensor] slot-symmetrized (production default)")
     D = Tt.shape[0]
     rng = np.random.default_rng(args.seed)
 
@@ -67,7 +78,7 @@ def main():
     for _ in range(args.grow):
         propose_and_apply(T, rng, 2)
     intw = Intertwiners(T, D, rng)
-    hb = make_heatbath(intw, Tt)
+    hb = make_heatbath(intw, Tt, beta=args.hb_beta)
     for _ in range(args.hb):
         hb(T, rng)
 
@@ -75,7 +86,9 @@ def main():
     mu = raw.mean()
     cen = raw - mu
     sigma = cen.std()
-    print(f"\n[heat-bath equilibrated, N4={len(raw)}]  mu={mu:.4f}")
+    print(f"\n[heat-bath equilibrated at exponent {args.hb_beta}, N4={len(raw)}]"
+          f"  mean cost = {mu:.4f}  (NB: the run's centering mu is the free "
+          f"energy from calibrate_mu_ti, not this mean)")
     print(f"  centered -log|amp|: sigma={sigma:.4f}  min={cen.min():.3f} max={cen.max():.3f}")
     qs = np.percentile(cen, [1, 10, 25, 50, 75, 90, 99])
     print(f"  percentiles [1,10,25,50,75,90,99] = {np.round(qs, 3)}")

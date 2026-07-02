@@ -2,8 +2,20 @@
 
 This bundle tests whether the v6 Causal-Dynamical-Triangulations engine generates
 **4-dimensional spacetime** from the graph (the "substrate" / emergence claim),
-first with bare Einstein-Regge dynamics (the known-answer gate) and then with the
-theory's EPRL spin-foam amplitude on top.
+first with bare Einstein-Regge dynamics (the known-answer gate) and then with two
+theory couplings on top: the EPRL spin-foam amplitude (`v6_theory_run.py`) and the
+paper's own admissibility-closure weighting (`v6_closure_run.py`, see
+`CLOSURE_MODEL.md`).
+
+> **ENGINE FIX (2026-07) — re-run the bare scans.** The pre-fix move set did
+> not preserve the CDT foliation: spatial slices drifted off the
+> closed-3-manifold condition (~5% defective triangles; culprit (2,4)/(3,3)
+> moves; see `CLOSURE_MODEL.md` §5). All runs now enforce the foliation by
+> default (`--no-causal-slices` reproduces the old generalized ensemble), the
+> live table has a `slice` column (must read `ok`), and the final line prints a
+> foliation verdict. Old checkpoints heal monotonically on resume, but the
+> bare volume scan below should be REDONE with the fixed engine — prior d_H
+> baselines were measured on the generalized ensemble.
 
 > **Why this is a VOLUME test (and not a strictness test).** We checked locally:
 > at strictness levels 0, 1, and 2 the engine gives *identical* geometry and stays
@@ -22,13 +34,21 @@ theory's EPRL spin-foam amplitude on top.
 * `pip install numpy scipy`  (nothing else — the engine is pure Python/NumPy).
 * A machine with **3+ cores** is ideal (run the volume scan in parallel).
 
-## 1. The bundle (13 files — all required)
+## 1. The bundle
 
 ```
+# engine + harness
 v6_cdt.py  v6_cdt_moves.py  v6_cdt_run.py  v6_run_lib.py
-v6_verify_run.py  v6_theory_run.py
+# runs: bare gate, EPRL coupling, closure coupling
+v6_verify_run.py  v6_theory_run.py  v6_closure_run.py
+run_eprl_sweep.sh  run_closure_sweep.sh  make_shuffled_control.py
+# EPRL vertex + legacy v5 support
+vertex_tensor.py  vertex_j3.npz
 v5_s1xs3_init.py  v5_cdt_link.py  v5_cdt_lib.py  v5_cdt_moves.py
-step3_linkA_harness.py  vertex_tensor.py  vertex_j3.npz
+step3_linkA_harness.py
+# diagnostics + records
+eprl_term_diagnostic.py  centering_beta_audit.py  ds_crosscheck.py
+SIM_AUDIT_coupling_misspecifications.md  CLOSURE_MODEL.md  VERTEX_PROVENANCE.md
 ```
 
 Unzip into one directory and `cd` into it. Quick smoke test (≈30 s):
@@ -108,38 +128,85 @@ If (and only if) the bare gate reaches 4D, run the EPRL amplitude **on top** and
 compare to the bare run **at the same volume**. The robust signal is the
 *difference* (finite-size effects cancel): does the amplitude steer the geometry?
 
+> **Post-audit protocol (2026-07).** The coupling machinery was audited and
+> fixed — see `SIM_AUDIT_coupling_misspecifications.md`. The sampler is now
+> exact for a declared joint measure: β-consistent label heat-bath,
+> free-energy centering (mu via thermodynamic integration, printed as
+> `# [mu TI]` lines and stored in the checkpoint), slot-symmetrized vertex
+> tensor, and a **mandatory shuffled-tensor placebo arm**. Use the sweep
+> script — it wires all of this up:
+
 ```bash
-# matched-volume comparison at, say, N_41 = 20000:
-#  (a) bare reference is scan_20k.json from step 2.
-#  (b) Regge + a small EPRL correction (safer first test), fast local action:
-nohup python -u v6_theory_run.py --mode regge_plus_eprl --beta-eprl 0.1 \
-      --local-eprl --audit-every 25 --target-n41 20000 --K 80 \
-      --checkpoint thy_b0.1_20k.json > thy_b0.1_20k.log 2>&1 &
+# from the bundle directory, with the bare checkpoint from step 2 available:
+BASE=scan_20k.json ./run_eprl_sweep.sh "0.0 0.05 0.1 0.3" 20000
+# watch:
+tail -n 4 logs/thy_b*_20k.log
+grep -hE 'mu TI|centering|audit ok|Traceback|BAD' logs/thy_b*_20k.log | tail -n 30
 ```
 
-* `--mode regge_plus_eprl` adds `beta_eprl * S_EPRL` to the Regge action (safe).
-  Sweep `--beta-eprl` 0.0 → 0.1 → 0.3 → 1.0 and watch d_H / blob / cos3err move.
-* `--local-eprl` uses the O(footprint) incremental action; `--audit-every 25`
-  recomputes from scratch every 25 sweeps and **aborts on any drift** (safety net).
-  Drop `--local-eprl` to use the simple global O(N) action as a cross-check.
-* `--mode eprl_only` replaces Regge entirely (only interpretable once the amplitude
-  fidelity is validated — see the caveats printed at startup).
+* Each arm resumes from the SAME thermalized bare checkpoint, pins the same
+  N41, calibrates its own mu (a few minutes of heat-bath passes at startup),
+  and runs with `--local-eprl --audit-every 25` (recompute-and-abort-on-drift
+  safety net).
+* The placebo arm (`thy_b0.3shuf_20k`) runs the largest β with an
+  entry-shuffled tensor (`make_shuffled_control.py`): same entry statistics,
+  all EPRL structure destroyed.
+
+### How to read it (gates BEFORE observables)
+
+1. **G3′ — matched N4.** All arms must sit at comparable **N4** (not just the
+   pinned N41). If N4 trends with β, the term is not volume-neutral — stop
+   and investigate; do not read d_H.
+2. **Placebo separation.** Compare the real β_max arm to the shuffled arm.
+   Only a real-vs-shuffled **difference** is attributable to the EPRL
+   amplitude's structure; if they match, the movement (or the flatness) is
+   machinery/entry-statistics, not EPRL.
+3. Then read d_H / blob / cos3err vs β against the bare run, as before.
 
 ### Honest caveats (printed by the theory run, repeated here)
 
-1. The vertex amplitude is the **frozen-j=3** tensor (`vertex_j3.npz`); the full
-   {15j} contraction still needs convention-checking, so **absolute** d_H from the
-   theory run is artefact-grade. What's robust is the **bare-vs-EPRL comparison at
-   matched volume**.
-2. New tetrahedra get a fresh (uniform) intertwiner not folded into the Hastings
-   ratio; the per-sweep heat-bath re-equilibrates labels. Fine for the
-   steer-direction comparison, not for precision sampling.
-3. `--k4 0.9` is a starting guess in our conventions. If N_41 runs away or freezes,
-   retune `--k4` (and/or `--eps`); the volume penalty is the real anchor.
+1. The vertex amplitude is the **frozen-j=3** tensor (`vertex_j3.npz`),
+   positivized (|A| — the true intertwiner contraction has order-unity sign
+   interference) and slot-symmetrized (the raw tensor's slot order is an
+   unchecked convention). It is a PLACEHOLDER for the EPRL amplitude;
+   **absolute** numbers are artefact-grade. What's meaningful is the
+   matched-volume comparison read against the placebo.
+2. A frozen-j amplitude has no area degrees of freedom (all triangles carry
+   the same spin), so it cannot feel deficit angles; the measured intertwiner
+   variance is type-blind. A flat sweep is therefore expected for structural
+   reasons and does NOT vindicate or falsify the theory (see the audit doc's
+   frozen-j vs peaked-j section).
+3. `--k4 0.9` is a starting guess in our conventions. If N_41 runs away or
+   freezes, retune `--k4` (and/or `--eps`); the volume penalty is the real
+   anchor.
 
 ---
 
-## 4. Rough sizing
+## 4. THE CLOSURE TEST — the paper's own weighting (recommended primary)
+
+The paper's stated selection principle is admissibility-closure counting on
+the seven-state tetrahedral ensemble — not a spin-foam amplitude. This
+coupling implements exactly that (positive weight, no sign problem, no
+external tensors; the run startup re-derives the paper's ⟨K²⟩ = 3/(2η\*) and
+g_share,eff = 7.4198 from the spec as a fidelity gate). Model, forks, and
+gates: `CLOSURE_MODEL.md`.
+
+```bash
+# needs a CLEAN bare checkpoint from the FIXED engine (step 2 rerun):
+BASE=scan_20k.json ./run_closure_sweep.sh "0.0 0.3 1.0" 20000
+# beta=1 is the theory point; a placebo arm (orbit-shuffled energies) runs
+# automatically at the top beta. Watch:
+grep -hE 'mu TI|centering|audit ok|foliation|Traceback|BAD' logs/clo_*_20k.log | tail -n 30
+```
+
+Read: foliation CLEAN on every arm → matched N4 → then d_H / blob / cos³ of
+the β=1 arm against the β=0 control AND the β=1 placebo. Only a
+real-vs-placebo difference is closure physics.
+
+
+---
+
+## 5. Rough sizing
 
 Pure-Python, single-threaded. The prior v6 run reached N_4≈6400 in ~30 min.
 Expect roughly: 10k in ~1-2 h, 20k in a few h, 40k in many h. The literature's
