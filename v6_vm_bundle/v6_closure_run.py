@@ -150,6 +150,7 @@ class FaceLabels:
     def __init__(self, rng):
         self.rng = rng
         self.lab = {}
+        self.pinned = set()       # triangles whose labels are FROZEN (defects)
         self.mu_saved = None
         self.mu_ctx = None
 
@@ -166,6 +167,8 @@ class FaceLabels:
     def serialize(self):
         out = [[*sorted(k), int(c)] for k, c in self.lab.items()]
         d = {"kind": "closure", "lab": out}
+        if self.pinned:
+            d["pinned"] = [sorted(k) for k in self.pinned]
         if self.mu_saved is not None:
             d["mu"] = float(self.mu_saved)
             if self.mu_ctx is not None:
@@ -180,8 +183,14 @@ class FaceLabels:
             print("# [closure labels] resume payload is not a closure payload "
                   "-- starting with fresh labels", flush=True)
             return
+        pin_labels = {k: self.lab[k] for k in self.pinned if k in self.lab}
         self.lab = {frozenset((int(a), int(b), int(c))): int(l)
                     for a, b, c, l in d["lab"]}
+        # pins applied BEFORE a resume survive the load: frozen labels win
+        # over the payload, and pin sets merge (stage 3 pins a fresh copy of
+        # a thermalized stage-2 checkpoint).
+        self.lab.update(pin_labels)
+        self.pinned |= {frozenset(map(int, k)) for k in d.get("pinned", [])}
 
 
 # ---------------------------------------------------------------------------
@@ -334,9 +343,12 @@ def _tri_map(tet_pids):
 
 def _heatbath_pass(labels, tet_pids, Etab, beta, rng):
     """Resample every triangle label from its exact conditional
-    prod_{tets containing it} exp(-beta E)."""
+    prod_{tets containing it} exp(-beta E). PINNED triangles (defect
+    carriers, stage 3) are never resampled."""
     tmap = _tri_map(tet_pids)
     for tri, tets in tmap.items():
+        if tri in labels.pinned:
+            continue
         logw = np.zeros(7)
         old = labels.lab[tri]
         for c in range(7):

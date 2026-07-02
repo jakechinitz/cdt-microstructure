@@ -212,9 +212,10 @@ def load_checkpoint(path):
 
 def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
         seed=0, max_sweeps=20000, measure_every=50, checkpoint=None,
-        strictness=2, causal=True, wall_budget_s=None, verbose=True,
-        resume=None, extra_hook=None, geometry_action=None, extra_state=None,
-        delta_action=None, audit_every=0, link_check_every=10):
+        strictness=2, causal=True, protect_vertices=None, wall_budget_s=None,
+        verbose=True, resume=None, extra_hook=None, geometry_action=None,
+        extra_state=None, delta_action=None, audit_every=0,
+        link_check_every=10):
     """Run CDT to `target_N41`, then thermalize, logging d_H + the volume
     profile and checkpointing.
 
@@ -271,9 +272,16 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
             if delta_action is not None:
                 n41_b = T.type_counts()[0]
                 T.begin_record()
-                mt, ok, undo = propose_and_apply(T, rng, strictness, causal)
+                mt, ok, undo = propose_and_apply(T, rng, strictness, causal,
+                                                 protect_vertices)
                 if not ok:
-                    T.take_record()              # discard (no net change)
+                    # NOT a no-op: a filter-triggered undo (strictness/causal)
+                    # re-creates pentachora with FRESH pids. Absorb the
+                    # apply+undo log so pid-keyed incremental state stays
+                    # honest (pre-fix this silently ghosted cache entries).
+                    ua, ur = T.take_record()
+                    if ua or ur:
+                        delta_action.reject(T, ua, ur)
                     continue
                 added, removed = T.take_record()
                 dS_geom = delta_action.delta(T, added, removed)
@@ -288,7 +296,8 @@ def run(action_label, k0, Delta, k4, target_N41, K=21, eps=1e-4, beta=1.0,
                     ua, ur = T.take_record()     # the undo's footprint
                     delta_action.reject(T, ua, ur)
             else:
-                mt, ok, undo = propose_and_apply(T, rng, strictness, causal)
+                mt, ok, undo = propose_and_apply(T, rng, strictness, causal,
+                                                 protect_vertices)
                 if not ok:
                     continue
                 S_new = action()
