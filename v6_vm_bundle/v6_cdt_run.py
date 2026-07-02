@@ -60,7 +60,7 @@ def hastings_log(mt, N4, N0):
     return 0.0  # (3,3)
 
 
-def propose_and_apply(T, rng, strictness=2, causal=True):
+def propose_and_apply(T, rng, strictness=2, causal=True, protect=None):
     """Pick a uniform move type + a random target, apply it, and return
     (move_label, ok, undo). A move that would create a degenerate (non-strict)
     configuration is undone and reported as ok=False -- so the chain stays on the
@@ -72,7 +72,15 @@ def propose_and_apply(T, rng, strictness=2, causal=True):
     with every spatial tetrahedron an interface between one future and one past
     pentachoron -- see causal_slice_ok). The pre-fix ensemble (causal=False)
     develops slice defects through (2,4)/(3,3) moves and is NOT the standard
-    CDT ensemble of the literature."""
+    CDT ensemble of the literature.
+
+    `protect` (optional set of vertex ids): veto (8,2) proposals on these
+    vertices BEFORE applying. Needed by the stage-3 defect runs: an (8,2)
+    that is applied and then undone (by ANY downstream rejection) re-creates
+    the vertex with a fresh id, which silently unkeys vertex-identified
+    structure like pinned defect carriers. Vetoing pre-apply is the only
+    id-stable protection; it restricts the ensemble exactly like the other
+    filters and must be identical across compared arms."""
     mt = MOVES[rng.integers(len(MOVES))]
     P = T.pent_bag.pick(rng)        # O(1) random pentachoron
     vs = T.pent[P]
@@ -102,6 +110,8 @@ def propose_and_apply(T, rng, strictness=2, causal=True):
                 undo = lambda: apply_82(T, x)
     elif mt == "(8,2)":
         x = T.vert_bag.pick(rng)        # O(1) random vertex
+        if protect and x in protect:
+            return mt, False, None      # protected carrier vertex (stage 3)
         ok, news = apply_82(T, x)
         if ok:
             Pn = news[0]
