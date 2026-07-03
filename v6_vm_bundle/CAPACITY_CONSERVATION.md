@@ -117,3 +117,22 @@ geometric stiffness remains an input; what conservation buys is the
 the paper actually claims. Chain so far: closure owns what mass is; refresh
 owns how mass strains its neighborhood (stage 3); conservation owns how the
 strain travels (stage 4); vacuum geometry is an input at every step.
+
+## 6. Implementation (v1): `v6_capacity_run.py`
+
+Model P as specified above, frozen geometry (labels dynamical), field per
+slice, exact conservation asserted every sweep. Pins a **commitment ladder**
+(1/2/3/6 colliding pairs = four mass levels) and measures M1 (emergent sink
+flux vs commitment) and M2 (shell-1 deficit per unit flux — the junction /
+lattice-G statement), with T3/T4 (profile form, screening mass) deferred to
+large-volume runs. Smoke-validated at 2k: deficit wells ordered by
+commitment (shell-1 f = 7.33 / 6.54 / 7.06 / 5.60 for levels 1/2/3/6
+against vacuum 7.42), monotone recovery with distance, emergent
+Q = 0.45→1.20 rising with the ladder (linear fit residual 13% at smoke
+statistics; note the physical self-screening at high commitment — the pin
+depletes its own supply). The recycle term pushes the far field slightly
+above 7.4198 on a closed slice (absorbed capacity has nowhere else to go)
+— expected bookkeeping, not a leak; T1 held to machine precision
+throughout. v2 extension (documented, not built): conservative field
+redistribution through Pachner moves via the change-log, enabling
+geometry-dynamical stage-4 runs.
