@@ -76,11 +76,16 @@ independently.
 Three rungs, honestly graded:
 
 1. **MEASURED — the volume-sector dressing** (`REGGE_BRIDGE.md`). The
-   closure sector's free energy per cell, computed analytically from η\*
-   alone, contributes an extensive term to the host action's volume
-   coupling, with magnitude predicted in advance: ΔN41 = −β·μ/(4ε) = −62.2.
-   (Any extensive matter free energy shifts a cosmological-sector coupling;
-   the content is the predicted magnitude, not the shift's existence.) Three-arm measurement:
+   closure sector's free energy per cell, computed from η\* and the
+   injectivity penalty before any coupled dynamics run, contributes an
+   extensive term to the host action's volume coupling, with magnitude
+   predicted in advance: ΔN41 = −β·μ/(4ε) = −62.2. (Any extensive matter
+   free energy shifts a cosmological-sector coupling; the content is the
+   predicted magnitude, not the shift's existence.) The single point is
+   now upgraded to a pre-registered scaling family — concave β-curve,
+   1/ε law, placebo displacing by its own μ_plc (28% from the real μ) —
+   with predictor and launch tooling in the repo (`bridge_predict.py`,
+   `run_bridge_sweep.sh`). Three-arm measurement:
    uncentered − centered = **−62.8** (~1%). A UV-spec number appears as a
    gravitational-action coefficient in a dynamical measurement.
 2. **PREDICTED — curvature-sector shifts.** c₀ ≈ 0.019 (closure) and
