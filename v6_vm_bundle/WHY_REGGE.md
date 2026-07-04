@@ -9,13 +9,22 @@ computational-companion section.
 
 ## 1. Two different things called "spacetime emergence"
 
-**Kinematic emergence — the substrate IS geometry, by construction.**
-Every cell is a geometrically consistent tetrahedron: the admissibility
-closure K² is precisely the closure condition that makes a quantum
-tetrahedron a tetrahedron, and the paper's length anchor
-λₑ/L\* = (2/3)e^{7g} converts every entanglement increment into meters.
-Any state of the substrate *is* a chunk of geometry. This cannot fail and
-no result in this repo questions it.
+**Kinematic emergence — the substrate ENCODES geometry, by construction.**
+Every cell is a geometrically consistent quantum tetrahedron: the
+admissibility closure K² is precisely the closure condition of the quantum
+tetrahedron, and the paper's length anchor λₑ/L\* = (2/3)e^{7g} converts
+entanglement increments into meters. IMPORTANT NUANCE (paper-faithful, and
+load-bearing for Lorentz invariance): the cells are DIMENSIONLESS
+combinatorial objects — units of capacity, not space-voxels with rigid
+edges. "The granularity lives in the capacity, not in a preferred spatial
+lattice" (the paper's own phrasing), which is exactly what evades the
+photon/GW dispersion bounds that killed rigid-lattice discrete-spacetime
+models. L\* is a statistical conversion rate, not a grid pitch. The
+simulation respects this separation: the theory's cells are the label
+configurations; the lattice simplices merely HOST them (supplying
+adjacency), as regulator scaffolding — and all measurements are matched
+comparisons at fixed regulator, so scaffold-scale artifacts cancel. This
+encoded-geometry claim cannot fail and no result in this repo questions it.
 
 **Dynamical selection — why is the realized geometry a smooth, extended,
 4D de Sitter one** rather than any of the combinatorially overwhelming
