@@ -279,7 +279,10 @@ def main():
     ap.add_argument("--k4", type=float, default=0.9)
     ap.add_argument("--eps", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--checkpoint", default="v6_defect_ckpt.json")
+    ap.add_argument("--checkpoint", default=None,
+                    help="engine checkpoint path (default: <out>_ckpt.json, "
+                         "so concurrently running arms never clobber each "
+                         "other's checkpoints)")
     ap.add_argument("--out", default="defect")
     ap.add_argument("--wall-hours", type=float, default=None)
     args = ap.parse_args()
@@ -290,6 +293,8 @@ def main():
     if not args.resume:
         sys.exit("--resume with a thermalized closure checkpoint is required "
                  "(run stage 2 first)")
+    if args.checkpoint is None:
+        args.checkpoint = args.out + "_ckpt.json"
 
     Etab = build_energy_table(args.eta, args.lambda_inj)
     rng = np.random.default_rng(args.seed)

@@ -191,6 +191,22 @@ def predict(args):
 
 _TAG = re.compile(r"bridge_b([0-9.]+)_e([0-9.eE+-]+)_(cen|unc)(plc)?")
 _ROW = re.compile(r"^\s*(\d+)\s+(\d+)\s+(\d+)\s")
+_MU_TI = re.compile(r"mu\([0-9.eE+-]+\)\s*=\s*(-?[0-9.]+)")
+_MU_REUSE = re.compile(r"reusing mu\s*=\s*(-?[0-9.]+)")
+
+
+def logged_mu(path):
+    """The mu the centered arm actually subtracted (last TI/reuse line in its
+    log). The pair difference isolates exactly this constant -- whatever the
+    TI's own noise -- so -beta*mu_arm/(4*eps) is the EXACT prediction for the
+    pair, while the predictor CSV is the independent pre-registration."""
+    mu = None
+    with open(path) as f:
+        for ln in f:
+            m = _MU_TI.search(ln) or _MU_REUSE.search(ln)
+            if m:
+                mu = float(m.group(1))
+    return mu
 
 
 def tail_mean_n41(path, tail):
@@ -228,7 +244,7 @@ def analyze(args):
             continue
         arms.setdefault((b, e, plc), {})[arm] = (mean, k, path)
     print(f"{'table':>8} {'beta':>6} {'eps':>9} {'N41_cen':>9} {'N41_unc':>9} "
-          f"{'measured':>9} {'predicted':>10} {'ratio':>6}")
+          f"{'measured':>9} {'pre-reg':>9} {'exact':>9} {'ratio':>6}")
     for (b, e, plc), d in sorted(arms.items()):
         if "cen" not in d or "unc" not in d:
             print(f"# incomplete pair beta={b} eps={e} plc={plc}: "
@@ -237,10 +253,18 @@ def analyze(args):
         meas = d["unc"][0] - d["cen"][0]
         table = "placebo" if plc else "real"
         p = pred.get((table, b, e))
-        ratio = (meas / p) if p else float("nan")
+        mu_arm = logged_mu(d["cen"][2])
+        px = (-b * mu_arm / (4 * e)) if mu_arm is not None else None
+        ref = px if px is not None else p
+        ratio = (meas / ref) if ref else float("nan")
         print(f"{table:>8} {b:>6.3g} {e:>9.3g} {d['cen'][0]:>9.1f} "
               f"{d['unc'][0]:>9.1f} {meas:>9.1f} "
-              f"{(f'{p:.1f}' if p is not None else '--'):>10} {ratio:>6.2f}")
+              f"{(f'{p:.1f}' if p is not None else '--'):>9} "
+              f"{(f'{px:.1f}' if px is not None else '--'):>9} {ratio:>6.2f}")
+    print("# 'pre-reg' = predictor-CSV value (independent TI, on record "
+          "before launch); 'exact' = -beta*mu_arm/(4*eps) using the mu the "
+          "centered arm actually subtracted (its own log) -- the pair "
+          "difference isolates exactly that constant, so ratio uses it.")
     print("# gates: ratio ~ 1 across the family; concave beta-curve (S1); "
           "1/eps collapse (S2); placebo tracks mu_plc, not mu_real (S3).")
 

@@ -162,6 +162,16 @@ def main():
     ap.add_argument("--sweeps", type=int, default=4000)
     ap.add_argument("--therm", type=int, default=400,
                     help="sweeps before measurements (field equilibration)")
+    ap.add_argument("--post-therm", type=int, default=None,
+                    help="field burn-in sweeps between the end of therm and "
+                         "the first measurement (default: therm in --absorb "
+                         "excess mode, 0 in total mode). In excess mode "
+                         "absorption is OFF during therm -- the field stays "
+                         "exactly uniform at the vacuum anchor while the "
+                         "collision baseline accumulates -- and the massless "
+                         "profile then needs ~rmax^2/D sweeps to form before "
+                         "it is measured; measuring the buildup transient "
+                         "would bias the T3/T4 fits toward screening.")
     ap.add_argument("--measure-every", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="cap_run")
@@ -218,6 +228,13 @@ def main():
     print(f"# [stage4] pinned ladder {per_lvl} across {len(order)} slices "
           f"(sep >= {args.pin_sep})", flush=True)
 
+    post = args.post_therm if args.post_therm is not None else \
+        (args.therm if args.absorb == "excess" else 0)
+    meas_start = args.therm + post
+    print(f"# [stage4] measurement window: sweeps {meas_start + 1}.."
+          f"{args.sweeps}  (therm {args.therm} + field burn-in {post})",
+          flush=True)
+
     # --- field init (vacuum anchor T2) --------------------------------------
     f = {t: np.full(len(sl["tets"]), G_SHARE_EFF) for t, sl in slices.items()}
     tot0 = sum(v.sum() for v in f.values())
@@ -269,8 +286,13 @@ def main():
                     flux[i] += ff[j] - ff[i]
             ff = ff + args.D * flux
             ncol = n_coll_vec(sl, labels, Etab)
-            if args.absorb == "excess" and sw > args.therm:
-                rate = np.maximum(0.0, ncol - nbar_now)
+            if args.absorb == "excess":
+                # no absorption during therm: the field stays exactly at the
+                # uniform vacuum anchor while nbar accumulates (nbar is a
+                # label-side statistic, independent of f), so the massless
+                # profile builds from a clean initial condition
+                rate = (np.maximum(0.0, ncol - nbar_now) if sw > args.therm
+                        else np.zeros_like(ncol))
             else:
                 rate = ncol
             absorb = args.kappa * rate * ff
@@ -282,7 +304,7 @@ def main():
             raise RuntimeError(f"conservation violated at sweep {sw}: "
                                f"{tot0} -> {tot}")
         # measurements
-        if sw > args.therm and sw % args.measure_every == 0:
+        if sw > meas_start and sw % args.measure_every == 0:
             Q_n += 1
             for pid, (lvl, t, c, d) in enumerate(shells):
                 sl = slices[t]
@@ -378,8 +400,67 @@ def analyze(prefix):
         print(f"M2 junction (dressing-subtracted shell-1 deficit per unit Q):"
               f" {Gl.mean():.4f} ± {Gl.std():.4f}  across levels "
               f"(constancy across the ladder = the lattice-G statement)")
-    print("\nT3/T4 (profile form + screening fit) need the larger-volume "
-          "run: fit ln(deficit) vs ln(d) / d across shells at 20k.")
+    # T3/T4: profile-form and screening fits on the dressing-subtracted
+    # deficit SHAPE (each level normalized to its own shell-1 deficit, then
+    # pooled over levels > 0; second half of the measurements only)
+    sw_all = sorted({int(r["sweep"]) for r in rows})
+    lo = sw_all[len(sw_all) // 2]
+    late = defaultdict(list)
+    for r in rows:
+        if int(r["sweep"]) >= lo:
+            late[(int(r["level"]), int(r["shell"]))].append(float(r["mean_f"]))
+    base = ({sh: G_SHARE_EFF - float(np.mean(late[(0, sh)]))
+             for sh in shells if late.get((0, sh))} if 0 in levels else {})
+    shape = {}
+    for sh in shells:
+        vals = []
+        for l in lv:
+            v, v1 = late.get((l, sh)), late.get((l, 1))
+            if v and v1:
+                dsh = G_SHARE_EFF - float(np.mean(v)) - base.get(sh, 0.0)
+                d1 = G_SHARE_EFF - float(np.mean(v1)) - base.get(1, 0.0)
+                if d1 > 1e-12:
+                    vals.append(dsh / d1)
+        if vals:
+            shape[sh] = (float(np.mean(vals)),
+                         float(np.std(vals) / max(1, len(vals)) ** 0.5))
+    print("\nT3/T4 deficit shape (dressing-subtracted, normalized to shell 1,"
+          " pooled over levels > 0, late half):")
+    for sh in sorted(shape):
+        m, e = shape[sh]
+        print(f"  d={sh}:  {m:+.4f} ± {e:.4f}")
+    pos = [(sh, m) for sh, (m, _) in sorted(shape.items()) if m > 0]
+    if len(pos) >= 3:
+        x = np.array([p[0] for p in pos], float)
+        y = np.array([p[1] for p in pos], float)
+        co, cov = np.polyfit(np.log(x), np.log(y), 1, cov=True)
+        p1, perr = float(co[0]), float(cov[0][0]) ** 0.5
+        co2, cov2 = np.polyfit(x, np.log(y * x), 1, cov=True)
+        s1, serr = float(co2[0]), float(cov2[0][0]) ** 0.5
+        print(f"T3 profile form: deficit ~ d^({p1:.2f} ± {perr:.2f})   "
+              f"(massless graph Green function on a 3-slice: ~ -1, with "
+              f"flattening at the slice radius)")
+        if abs(s1) < 2 * serr:
+            bound = abs(s1) + 2 * serr
+            print(f"T4 screening:    d ln(deficit*d)/dd = {s1:+.4f} ± {serr:.4f}"
+                  f" -- consistent with MASSLESS (xi > {1 / bound:.1f} steps):"
+                  f" gate PASS")
+        elif s1 < 0:
+            print(f"T4 screening:    d ln(deficit*d)/dd = {s1:+.4f} ± {serr:.4f}"
+                  f" -- xi = {-1 / s1:.1f} steps: SCREENED (Route-A leak, or "
+                  f"buildup transient if --post-therm was small): gate FAIL")
+        else:
+            print(f"T4 screening:    d ln(deficit*d)/dd = {s1:+.4f} ± {serr:.4f}"
+                  f" -- positive (closed-slice zero mode / far-field surplus "
+                  f"dominating): inspect the shape table")
+        print("  caveats: the closed-slice zero mode elevates the far field, "
+              "so negative-shape shells are excluded from the fits; quoted "
+              "errors ignore sweep autocorrelation (thin with "
+              "--measure-every if in doubt); usable range is capped by the "
+              "slice radius -- check n_cells per shell in the CSV.")
+    else:
+        print("T3/T4: fewer than 3 shells with positive deficit -- range too "
+              "short to fit (larger slices / larger N41 needed).")
 
 
 if __name__ == "__main__":
