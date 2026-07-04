@@ -61,14 +61,42 @@ def slice_corr(prof):
 
 
 def run_point(args_tuple):
-    (k0, Delta, k4, eps, target, K, sweeps, seed, measure_tail) = args_tuple
+    (k0, Delta, k4, eps, target, K, sweeps, seed, tune_rounds) = args_tuple
     # import inside the worker (multiprocessing-safe)
     from v6_run_lib import run, dual_adjacency, hausdorff_dim, volume_profile, \
         profile_metrics
+    import os
+    import tempfile
     t0 = time.time()
+    # --- optional k4 auto-tuning to pseudo-criticality ----------------------
+    # Real CDT tunes k4 per (k0, Delta) point; a fixed k4 makes the eps pin
+    # fight real volume pressure in parts of the grid (visible as a large
+    # |pin| residual) and those cells are not fair tests. The pin force IS
+    # the mistuning signal, so use it as the feedback error:
+    #     k4  <-  k4 + 2*eps*(N41 - target)
+    # over a few short bursts before the measurement run.
+    ckpt = None
+    if tune_rounds > 0:
+        fd, ckpt = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        burst = max(20, sweeps // (2 * tune_rounds))
+        resume = None
+        for _ in range(int(tune_rounds)):
+            T = run(f"tune k0={k0} D={Delta}", k0=k0, Delta=Delta, k4=k4,
+                    target_N41=target, K=K, eps=eps, seed=seed,
+                    max_sweeps=burst, measure_every=burst, checkpoint=ckpt,
+                    resume=resume, verbose=False)
+            resume = ckpt
+            k4 = k4 + 2 * eps * (T.type_counts()[0] - target)
     T = run(f"grid k0={k0} D={Delta}", k0=k0, Delta=Delta, k4=k4,
             target_N41=target, K=K, eps=eps, seed=seed, max_sweeps=sweeps,
-            measure_every=max(1, sweeps // 4), checkpoint=None, verbose=False)
+            measure_every=max(1, sweeps // 4), checkpoint=None,
+            resume=ckpt, verbose=False)
+    if ckpt:
+        try:
+            os.unlink(ckpt)
+        except OSError:
+            pass
     ids, adj = dual_adjacency(T)
     dH = hausdorff_dim(adj)
     prof = volume_profile(T)
@@ -78,7 +106,8 @@ def run_point(args_tuple):
     okf, repf = getattr(T, "_final_verify", (None, {}))
     sl_bad, _, sl_ss = getattr(T, "_final_slices", (None, {}, None))
     return {
-        "k0": k0, "Delta": Delta, "k4": k4, "K": K, "target_n41": target,
+        "k0": k0, "Delta": Delta, "k4": round(k4, 4), "K": K,
+        "target_n41": target,
         "sweeps": sweeps, "seed": seed,
         "N4": T.n_pent(), "N41": n41,
         "n0n4": round(len(T.vinc) / max(1, T.n_pent()), 4),
@@ -168,6 +197,11 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--jobs", type=int, default=1,
                     help="grid points run in parallel (one core each)")
+    ap.add_argument("--tune-k4", type=int, default=0, metavar="ROUNDS",
+                    help="auto-tune k4 to pseudo-criticality per point over "
+                         "N short bursts before measuring (recommended: 3). "
+                         "Uses the eps-pin residual as the feedback error; "
+                         "the tuned k4 is recorded in the CSV.")
     ap.add_argument("--out", default="phase_grid")
     ap.add_argument("--plot", default=None, metavar="CSV",
                     help="render heatmaps from an existing results CSV and exit")
@@ -195,7 +229,7 @@ def main():
         return
 
     tasks = [(k0, D, args.k4, args.eps, args.target_n41, args.K,
-              args.sweeps, args.seed, 4) for k0, D in points]
+              args.sweeps, args.seed, args.tune_k4) for k0, D in points]
     new_file = not os.path.exists(csv_path)
     f = open(csv_path, "a", newline="")
     w = csv.DictWriter(f, fieldnames=FIELDS)

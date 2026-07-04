@@ -60,8 +60,13 @@ from v6_closure_run import (ETA_STAR, build_energy_table, tet_of, tris_of,
 
 G_SHARE_EFF = 7.4198          # vacuum budget anchor (paper App. B; verified)
 
-# commitment ladder: frozen label configs with 1, 2, 3, 6 colliding pairs
+# commitment ladder: frozen label configs with 0, 1, 2, 3, 6 colliding pairs.
+# Level 0 (frozen but perfectly closed) is the DRESSING BASELINE: any frozen
+# boundary slightly elevates neighbor failure regardless of its own
+# commitment, contributing a level-independent flux offset. Q(m) - Q(0) is
+# the commitment-scaling maintenance flux the paper's postulate concerns.
 LADDER = {
+    0: (3, 4, 5, 6),          # injective, K^2 minimal -- placebo rung
     1: (3, 3, 4, 5),          # one equal pair
     2: (3, 3, 4, 4),          # two equal pairs
     3: (3, 3, 3, 4),          # three equal pairs (triple)
@@ -144,6 +149,16 @@ def main():
                     help="transport coefficient (stability: <= 0.25)")
     ap.add_argument("--kappa", type=float, default=0.05,
                     help="absorption per colliding pair per sweep")
+    ap.add_argument("--absorb", choices=["excess", "total"], default="excess",
+                    help="v1.1 default 'excess': absorb only failure ABOVE the "
+                         "vacuum mean (measured during therm), so the vacuum "
+                         "is absorption-free and the field massless -- required "
+                         "for the T3/T4 Coulomb gates and for a proportional "
+                         "M1. 'total' reproduces v1: vacuum turnover absorbs "
+                         "too, giving intrinsic Yukawa screening at "
+                         "xi = sqrt(D/(kappa*<n_coll>_vac)) ~ 5-7 steps (this "
+                         "quantitatively explains the v1 run's observed 4-5 "
+                         "step range and its M1 offset b~0.4).")
     ap.add_argument("--sweeps", type=int, default=4000)
     ap.add_argument("--therm", type=int, default=400,
                     help="sweeps before measurements (field equilibration)")
@@ -219,11 +234,31 @@ def main():
     Q_acc = defaultdict(float)               # pin_id -> absorbed near pin
     Q_n = 0
 
+    # vacuum baseline failure rate (for --absorb excess): accumulated over
+    # the second half of therm, over cells far from every pin
+    pin_far = {}
+    for lvl, t, c, d in shells:
+        pin_far.setdefault(t, np.ones(len(slices[t]["tets"]), bool))
+        pin_far[t] &= ~((d >= 0) & (d <= args.rmax))
+    nbar_acc, nbar_n = 0.0, 0
+
     for sw in range(1, args.sweeps + 1):
         # (i) label heat-bath per slice (beta-consistent; pins frozen)
         for t, sl in slices.items():
             _heatbath_pass(labels, sl["tet_pids"], Etab,
                            args.beta_closure, rng)
+        # vacuum-baseline calibration during the second half of therm
+        if args.therm // 2 < sw <= args.therm:
+            for t, sl in slices.items():
+                far = pin_far.get(t)
+                ncol = n_coll_vec(sl, labels, Etab)
+                sel = ncol[far] if far is not None else ncol
+                nbar_acc += float(sel.sum()); nbar_n += len(sel)
+            if sw == args.therm:
+                nbar = nbar_acc / max(1, nbar_n)
+                print(f"# [stage4] vacuum baseline <n_coll> = {nbar:.4f}  "
+                      f"(absorb mode: {args.absorb})", flush=True)
+        nbar_now = (nbar_acc / max(1, nbar_n)) if nbar_n else 0.0
         # (ii) transport + (iii) failure-proportional absorption, recycled
         for t, sl in slices.items():
             adj = sl["adj"]
@@ -234,7 +269,11 @@ def main():
                     flux[i] += ff[j] - ff[i]
             ff = ff + args.D * flux
             ncol = n_coll_vec(sl, labels, Etab)
-            absorb = args.kappa * ncol * ff
+            if args.absorb == "excess" and sw > args.therm:
+                rate = np.maximum(0.0, ncol - nbar_now)
+            else:
+                rate = ncol
+            absorb = args.kappa * rate * ff
             ff = ff - absorb + absorb.sum() / len(ff)
             f[t] = ff
         # T1 gate: exact conservation
@@ -248,9 +287,14 @@ def main():
             for pid, (lvl, t, c, d) in enumerate(shells):
                 sl = slices[t]
                 ncol = n_coll_vec(sl, labels, Etab)
-                # flux drawn by the pin + its immediate shell (emergent Q)
+                # flux drawn by the pin + its immediate shell (emergent Q),
+                # measured with the SAME rate law as the dynamics
                 near = (d >= 0) & (d <= 1)
-                Q = float((args.kappa * ncol[near] * f[t][near]).sum())
+                if args.absorb == "excess":
+                    rate_n = np.maximum(0.0, ncol[near] - nbar_now)
+                else:
+                    rate_n = ncol[near]
+                Q = float((args.kappa * rate_n * f[t][near]).sum())
                 Q_acc[pid] += Q
                 for sh in range(1, args.rmax + 1):
                     m = d == sh
@@ -297,20 +341,42 @@ def analyze(prefix):
                     q.mean())
         print(f"{lvl:>6} " + "".join(cells)
               + f" {q.mean():>10.4f} ±{q.std()/max(1,len(q))**0.5:.4f}")
-    # M1: sink linearity  Q(level) ~ a*level + b
+    # M1: sink linearity  Q(level) ~ a*level + b, plus the proportional fit
+    # (the paper's maintenance postulate wants Q proportional to commitment;
+    # in --absorb excess mode b should be consistent with 0, in total mode
+    # b is the vacuum-baseline absorption of the pin zone)
     ls = np.array(levels, float)
     qs = np.array([far[l][1] for l in levels])
     a, b = np.polyfit(ls, qs, 1)
     resid = float(np.abs(qs - (a * ls + b)).max() / max(qs.max(), 1e-12))
-    print(f"\nM1 sink linearity: Q = {a:.4f}*commitment + {b:.4f}   "
+    a0 = float((qs * ls).sum() / (ls * ls).sum())
+    resid0 = float(np.abs(qs - a0 * ls).max() / max(qs.max(), 1e-12))
+    print(f"\nM1 sink linearity (affine):       Q = {a:.4f}*m + {b:.4f}  "
           f"(max rel. residual {resid:.3f})")
-    # M2 junction: shell-1 deficit per unit emergent Q (lattice-G analog)
-    d1 = np.array([G_SHARE_EFF - far[l][0] for l in levels])
-    good = qs > 1e-9
+    print(f"M1 sink linearity (proportional): Q = {a0:.4f}*m           "
+          f"(max rel. residual {resid0:.3f})")
+    if 0 in far:
+        b0 = far[0][1]
+        m_pos = ls > 0
+        qc = qs[m_pos] - b0
+        lp = ls[m_pos]
+        ac = float((qc * lp).sum() / (lp * lp).sum())
+        rc = float(np.abs(qc - ac * lp).max() / max(abs(qc).max(), 1e-12))
+        print(f"M1 DRESSING-SUBTRACTED (the claim): Q - Q(0) = {ac:.4f}*m  "
+              f"(dressing baseline Q(0) = {b0:.4f}; max rel. residual {rc:.3f})")
+    # M2 junction: shell-1 deficit per unit emergent Q (lattice-G analog).
+    # Level 0 is the dressing baseline, not a mass -- excluded; both deficit
+    # and flux are dressing-subtracted when the level-0 rung is present.
+    b0 = far[0][1] if 0 in far else 0.0
+    d0 = (G_SHARE_EFF - far[0][0]) if 0 in far else 0.0
+    lv = [l for l in levels if l > 0]
+    d1 = np.array([(G_SHARE_EFF - far[l][0]) - d0 for l in lv])
+    qq = np.array([far[l][1] - b0 for l in lv])
+    good = qq > 1e-9
     if good.any():
-        Gl = (d1[good] / qs[good])
-        print(f"M2 junction (shell-1 deficit per unit Q): "
-              f"{Gl.mean():.4f} ± {Gl.std():.4f}  across levels "
+        Gl = (d1[good] / qq[good])
+        print(f"M2 junction (dressing-subtracted shell-1 deficit per unit Q):"
+              f" {Gl.mean():.4f} ± {Gl.std():.4f}  across levels "
               f"(constancy across the ladder = the lattice-G statement)")
     print("\nT3/T4 (profile form + screening fit) need the larger-volume "
           "run: fit ln(deficit) vs ln(d) / d across shells at 20k.")
