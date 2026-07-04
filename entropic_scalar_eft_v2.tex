@@ -3493,11 +3493,17 @@ The label sector behaves as designed: the control arm's collision fraction $0.64
 
 \subsection*{J.6 The Regge bridge: a predicted volume-sector dressing}
 
-The centering constant $\mu$ of J.2 also gives a direct prediction. In the centered ensemble, the subtraction of $\mu$ removes the extensive label free energy from the geometry marginal. If that subtraction is omitted, the geometry sees a residual positive linear contribution $+\beta\mu N_{\rm cells}$ to the effective action. Here $N_{41}$ denotes the total number of $(4,1)$ and $(1,4)$ pentachora, so each spatial cell, shared by one pentachoron of each orientation, is counted once by the pair and $N_{\rm cells}=N_{41}/2$. The positive linear tilt competes with the quadratic volume pin $\varepsilon(N_{41}-\bar N)^2$ and shifts the equilibrium volume downward by
+The centering constant $\mu$ of J.2 also gives a direct prediction. In the centered ensemble, the subtraction of $\mu$ removes the extensive label free energy from the geometry marginal. If that subtraction is omitted, the geometry sees a residual positive linear contribution $+\beta\mu N_{\rm cells}$ to the effective action. Here $N_{41}$ denotes the total number of $(4,1)$ and $(1,4)$ pentachora, so each spatial cell, shared by one pentachoron of each orientation, is counted once by the pair and $N_{\rm cells}=N_{41}/2$. The positive linear tilt competes with the quadratic volume pin $\varepsilon(N_{41}-\bar N)^2$, and the shift follows in two lines. The volume-dependent part of the effective action is
 \[
-\Delta N_{41}=-\frac{\beta\,\mu}{4\,\varepsilon},
+S_{\rm vol}(N_{41})
+=\varepsilon\,(N_{41}-\bar N)^2+\beta\mu\,N_{\rm cells}
+=\varepsilon\,(N_{41}-\bar N)^2+\frac{\beta\mu}{2}\,N_{41},
 \]
-and $\mu$ is computed analytically by transfer-matrix thermodynamic integration from $\eta_*$ and the injectivity penalty, with no lattice input. At the demonstration point ($\beta=1$, $\mu=2.488$, $\varepsilon=0.01$) the prediction is $\Delta N_{41}=-62.2$. Three arms from a common clean base at $N_{41}=2000$ measure it:
+and setting $dS_{\rm vol}/dN_{41}=2\varepsilon(N_{41}-\bar N)+\beta\mu/2=0$ gives the equilibrium displacement
+\[
+\Delta N_{41}=N_{41}^{\rm eq}-\bar N=-\frac{\beta\,\mu}{4\,\varepsilon}.
+\]
+Here $\mu$ is computed analytically by transfer-matrix thermodynamic integration from $\eta_*$ and the injectivity penalty, with no lattice input. At the demonstration point ($\beta=1$, $\mu=2.488$, $\varepsilon=0.01$) the prediction is $\Delta N_{41}=-2.488/0.04=-62.2$. Three arms from a common clean base at $N_{41}=2000$ measure it:
 
 \begin{center}
 {\small
