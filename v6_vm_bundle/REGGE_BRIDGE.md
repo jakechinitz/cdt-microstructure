@@ -1,11 +1,13 @@
-# The Regge bridge: the substrate writes the volume term (measured)
+# The Regge bridge: a predicted volume-sector dressing (measured)
 
-**Claim tested:** the substrate is not merely *hosted by* the Regge action —
-it quantitatively AUTHORS part of it. The closure sector's free energy per
-cell (mu, computed analytically by transfer-matrix thermodynamic
+**Claim tested:** the substrate contributes a predicted extensive term to
+the host Regge action's volume coupling. The closure sector's free energy
+per cell (mu, computed analytically by transfer-matrix thermodynamic
 integration from the paper's eta* and the injectivity penalty — no lattice
-input) is a contribution to the volume (cosmological/Delta) term of the
-effective Regge action. That is a PREDICTION with a number attached:
+input) shifts the volume (cosmological/Delta) sector of the effective
+Regge action. Any extensive matter free energy shifts a cosmological-sector
+coupling — the content here is not the existence of the shift but its
+magnitude, predicted in advance:
 coupling the substrate uncentered at beta=1 must displace the equilibrium
 volume, relative to the centered arm, by
 
@@ -32,8 +34,8 @@ production; it cancels in the difference).
 seven-state ensemble) appears, at the predicted magnitude, as a coefficient
 of the Regge action's volume sector in a dynamical lattice measurement.
 The substrate does not derive Regge — the six-branch no-go stands — but it
-demonstrably *dresses* Regge: it writes a computable piece of the volume
-term (this measurement), and computable local shifts of the curvature-
+demonstrably *dresses* Regge: a computable, predicted-in-advance piece of
+the volume coupling (this measurement), and computable local shifts of the curvature-
 sector couplings (c0 ~ 0.019 closure, ~0.08 seven-channel field; phase-
 boundary-displacement measurement pre-registered for production
 statistics). Regge-as-background is therefore not an arbitrary import:

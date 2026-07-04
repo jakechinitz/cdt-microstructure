@@ -71,24 +71,28 @@ supplies matter and response) is *forced* by the theory's specified
 ingredients. The paper's architecture and the mathematics agree,
 independently.
 
-## 4. The relation is not decorative: the substrate co-authors Regge
+## 4. The relation is not decorative: the substrate dresses Regge at a predicted size
 
 Three rungs, honestly graded:
 
-1. **MEASURED — the volume term** (`REGGE_BRIDGE.md`). The closure
-   sector's free energy per cell, computed analytically from η\* alone,
-   is a contribution to the Regge action's volume sector, with magnitude
-   predicted in advance: ΔN41 = −β·μ/(4ε) = −62.2. Three-arm measurement:
+1. **MEASURED — the volume-sector dressing** (`REGGE_BRIDGE.md`). The
+   closure sector's free energy per cell, computed analytically from η\*
+   alone, contributes an extensive term to the host action's volume
+   coupling, with magnitude predicted in advance: ΔN41 = −β·μ/(4ε) = −62.2.
+   (Any extensive matter free energy shifts a cosmological-sector coupling;
+   the content is the predicted magnitude, not the shift's existence.) Three-arm measurement:
    uncentered − centered = **−62.8** (~1%). A UV-spec number appears as a
    gravitational-action coefficient in a dynamical measurement.
 2. **PREDICTED — curvature-sector shifts.** c₀ ≈ 0.019 (closure) and
    ~0.08/cell (7-channel field, local part) are computed; the measurement
    is a phase-boundary displacement between bare and coupled ensembles at
    production statistics. Pre-registered, not yet resolved.
-3. **STRUCTURAL — kinship, not derivation.** The closure defect K² (cell
-   level) and the deficit angle (hinge level) are both failure-to-close
-   functionals. An honest analogy; the smallness of rung 2 is the measured
-   statement of how weakly the two levels currently couple.
+3. **STRUCTURAL — kinship, not identity.** K² measures the failure of a
+   cell's oriented faces to close; a Regge deficit angle measures the
+   failure of the dihedral angles around a hinge to close. The kinship is
+   structural rather than identical — an honest analogy, and the smallness
+   of rung 2 is the measured statement of how weakly the two levels
+   currently couple.
 
 ## 5. What the substrate demonstrably does, inside the conditioned vacuum
 
