@@ -1,0 +1,10 @@
+ level          d=1         d=2         d=3         d=4         d=5   Q (emergent)
+     1       7.0800      7.2689      7.4082      7.4628      7.4576     0.4406 ±0.0011
+     2       6.3912      6.7873      7.0831      7.3062      7.4396     0.6572 ±0.0010
+     3       6.2125      6.7727      7.2043      7.4267      7.4772     0.8650 ±0.0011
+     6       5.0394      5.9059      6.5692      7.0942      7.4613     1.0698 ±0.0012
+
+M1 sink linearity: Q = 0.1193*commitment + 0.4001   (max rel. residual 0.100)
+M2 junction (shell-1 deficit per unit Q): 1.4893 ± 0.5176  across levels (constancy across the ladder = the lattice-G statement)
+
+T3/T4 (profile form + screening fit) need the larger-volume run: fit ln(deficit) vs ln(d) / d across shells at 20k.

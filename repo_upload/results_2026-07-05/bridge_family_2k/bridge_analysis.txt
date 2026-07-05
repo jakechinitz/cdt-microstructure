@@ -1,0 +1,15 @@
+files: "logs\bridge_b0.25_e0.005_cen_2k.log" "logs\bridge_b0.25_e0.005_unc_2k.log" "logs\bridge_b0.25_e0.01_cen_2k.log" "logs\bridge_b0.25_e0.01_unc_2k.log" "logs\bridge_b0.25_e0.02_cen_2k.log" "logs\bridge_b0.25_e0.02_unc_2k.log" "logs\bridge_b0.5_e0.005_cen_2k.log" "logs\bridge_b0.5_e0.005_unc_2k.log" "logs\bridge_b0.5_e0.01_cen_2k.log" "logs\bridge_b0.5_e0.01_unc_2k.log" "logs\bridge_b0.5_e0.02_cen_2k.log" "logs\bridge_b0.5_e0.02_unc_2k.log" "logs\bridge_b1.0_e0.005_cenplc_2k.log" "logs\bridge_b1.0_e0.005_cen_2k.log" "logs\bridge_b1.0_e0.005_uncplc_2k.log" "logs\bridge_b1.0_e0.005_unc_2k.log" "logs\bridge_b1.0_e0.01_cen_2k.log" "logs\bridge_b1.0_e0.01_unc_2k.log" "logs\bridge_b1.0_e0.02_cen_2k.log" "logs\bridge_b1.0_e0.02_unc_2k.log" 
+# skip (no measurement rows): logs\bridge_b0.5_e0.02_cen_2k.log
+   table   beta       eps   N41_cen   N41_unc  measured   pre-reg     exact  ratio
+    real   0.25     0.005    2002.2    1958.9     -43.2     -43.1     -43.1   1.00
+    real   0.25      0.01    1997.0    1977.9     -19.1     -21.5     -21.5   0.89
+    real   0.25      0.02    1999.3    1988.8     -10.5     -10.8     -10.8   0.98
+    real    0.5     0.005    1991.7    1914.0     -77.6     -75.7     -76.0   1.02
+    real    0.5      0.01    1995.5    1954.8     -40.8     -37.9     -38.0   1.07
+# incomplete pair beta=0.5 eps=0.02 plc=False: have ['unc']
+    real      1     0.005    1957.4    1836.2    -121.2    -125.3    -125.7   0.96
+ placebo      1     0.005    1933.6    1776.0    -157.6    -156.3    -157.2   1.00
+    real      1      0.01    1978.1    1914.9     -63.1     -62.7     -62.8   1.00
+    real      1      0.02    1989.7    1957.0     -32.8     -31.3     -31.4   1.04
+# 'pre-reg' = predictor-CSV value (independent TI, on record before launch); 'exact' = -beta*mu_arm/(4*eps) using the mu the centered arm actually subtracted (its own log) -- the pair difference isolates exactly that constant, so ratio uses it.
+# gates: ratio ~ 1 across the family; concave beta-curve (S1); 1/eps collapse (S2); placebo tracks mu_plc, not mu_real (S3).

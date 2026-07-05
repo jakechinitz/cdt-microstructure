@@ -1,0 +1,8 @@
+
+== clo_b1.0_20k_frozen.json ==
+  cells: 9899  failing: 802 (0.081)  (label-less skipped: 0)
+  observable            failing            closing               diff
+      mean_q       5.3928             5.4006        -0.0093 ± 0.0411   
+       ball2      11.4476            11.4753        -0.0352 ± 0.0801   
+        nbrE       1.7271             1.7355        -0.0076 ± 0.0150   
+  (one snapshot -- preview-grade statistics; the pinned-defect run is the real measurement)

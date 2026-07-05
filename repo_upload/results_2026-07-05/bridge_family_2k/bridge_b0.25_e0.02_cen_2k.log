@@ -1,0 +1,255 @@
+!! WITH-THEORY (ADMISSIBILITY-CLOSURE) run -- the paper's own cell weighting, not a spin-foam amplitude.
+   beta=0.25  eta=0.0298668  lambda_inj=3.0  placebo=False
+   [fidelity] injective ensemble at this eta: <K^2>=50.223 (closure relation 3/(2 eta)=50.223)  entropy=7.4198 (paper: 7.4198 at eta*)
+# [mu TI] closure: 1059 spatial tets, 7 grid points x 3+2 passes
+# [mu TI]   s=0.0000  <E_bar>_s = 4.1606
+# [mu TI]   s=0.0417  <E_bar>_s = 3.8180
+# [mu TI]   s=0.0833  <E_bar>_s = 3.5635
+# [mu TI]   s=0.1250  <E_bar>_s = 3.4222
+# [mu TI]   s=0.1667  <E_bar>_s = 3.2092
+# [mu TI]   s=0.2083  <E_bar>_s = 3.1068
+# [mu TI]   s=0.2500  <E_bar>_s = 2.9365
+# [mu TI] mu(0.25) = 3.4447  (uniform 4.1606 -> equilibrated 2.9365; mu is the free energy, between)
+[resume] N4=4678 N41=2118 (extra_state absent)
+# [closure centering] mu = 3.4447 per cell (fixed; free-energy calibrated => volume-neutral, keep k4 at the bare value)
+# v6 run [CLOSURE [beta=0.25]]  target N41=2000  K=16  (k0=2.2, D=0.6, k4=0.9, eps=0.02)
+ sweep      N4     N41    d_H   blob active cos3err  valid links slice   wall_s
+    20    4462    1992   2.56   2.68      3   0.339     ok     -    ok      363
+# [audit ok] sweep 25: S=2944.5596 matches recompute (drift 4.5e-13)
+    40    4420    1998   2.60   2.80      4   0.353     ok     -    ok      689
+# [audit ok] sweep 50: S=2895.2576 matches recompute (drift 4.5e-13)
+    60    4360    1998   2.66   2.87      3   0.356     ok     -    ok     1004
+# [audit ok] sweep 75: S=2840.9785 matches recompute (drift 4.5e-13)
+    80    4388    2006   2.55   2.70      3   0.294     ok     -    ok     1318
+# [audit ok] sweep 100: S=2870.0619 matches recompute (drift 4.5e-13)
+   100    4418    2004   2.51   2.91      4   0.313     ok     -    ok     1628
+   120    4376    2008   2.62   2.90      4   0.338     ok     -    ok     1951
+# [audit ok] sweep 125: S=2780.9155 matches recompute (drift 0.0e+00)
+   140    4360    1998   2.81   2.80      4   0.263     ok     -    ok     2267
+# [audit ok] sweep 150: S=2900.9775 matches recompute (drift 4.5e-13)
+   160    4404    2004   2.66   2.67      4   0.320     ok     -    ok     2519
+# [audit ok] sweep 175: S=2913.2398 matches recompute (drift 4.5e-13)
+   180    4434    1998   2.58   2.80      3   0.288     ok     -    ok     2661
+# [audit ok] sweep 200: S=2939.7481 matches recompute (drift 4.5e-13)
+   200    4464    2006   2.67   2.89      4   0.288     ok    ok    ok     2826
+   220    4518    2002   2.60   2.97      3   0.321     ok     -    ok     2970
+# [audit ok] sweep 225: S=3004.9800 matches recompute (drift 9.1e-13)
+   240    4578    2004   2.71   2.57      5   0.319     ok     -    ok     3112
+# [audit ok] sweep 250: S=2998.9838 matches recompute (drift 4.5e-13)
+   260    4496    1990   2.68   2.69      3   0.327     ok     -    ok     3256
+# [audit ok] sweep 275: S=2906.7150 matches recompute (drift 4.5e-13)
+   280    4468    2000   2.75   2.69      3   0.316     ok     -    ok     3398
+# [audit ok] sweep 300: S=2915.7368 matches recompute (drift 4.5e-13)
+   300    4438    2006   2.64   2.81      4   0.341     ok     -    ok     3534
+   320    4448    1992   2.59   2.65      3   0.347     ok     -    ok     3668
+# [audit ok] sweep 325: S=2902.0317 matches recompute (drift 4.5e-13)
+   340    4508    2000   2.65   2.59      4   0.306     ok     -    ok     3802
+# [audit ok] sweep 350: S=2922.0304 matches recompute (drift 4.5e-13)
+   360    4438    1996   2.66   2.52      4   0.268     ok     -    ok     3936
+# [audit ok] sweep 375: S=2925.2821 matches recompute (drift 4.5e-13)
+   380    4468    1996   2.70   2.87      4   0.304     ok     -    ok     4071
+# [audit ok] sweep 400: S=2981.5504 matches recompute (drift 9.1e-13)
+   400    4530    2000   2.64   2.58      5   0.297     ok    ok    ok     4226
+   420    4520    1996   2.71   2.53      4   0.243     ok     -    ok     4363
+# [audit ok] sweep 425: S=2970.3840 matches recompute (drift 0.0e+00)
+   440    4504    2002   2.60   2.64      4   0.339     ok     -    ok     4497
+# [audit ok] sweep 450: S=3034.4342 matches recompute (drift 0.0e+00)
+   460    4600    1994   2.63   2.57      4   0.256     ok     -    ok     4633
+# [audit ok] sweep 475: S=3064.5808 matches recompute (drift 4.5e-13)
+   480    4556    1998   2.63   2.58      4   0.355     ok     -    ok     4765
+# [audit ok] sweep 500: S=3076.5130 matches recompute (drift 4.5e-13)
+   500    4608    2006   2.70   2.54      4   0.256     ok     -    ok     4900
+   520    4570    1998   2.58   3.01      4   0.278     ok     -    ok     5033
+# [audit ok] sweep 525: S=2997.9473 matches recompute (drift 4.5e-13)
+   540    4524    1994   2.67   3.08      4   0.296     ok     -    ok     5171
+# [audit ok] sweep 550: S=2971.3563 matches recompute (drift 4.5e-13)
+   560    4490    1996   2.72   2.89      4   0.359     ok     -    ok     5307
+# [audit ok] sweep 575: S=2967.7694 matches recompute (drift 4.5e-13)
+   580    4522    1998   2.67   2.74      4   0.296     ok     -    ok     5442
+# [audit ok] sweep 600: S=3004.3960 matches recompute (drift 9.1e-13)
+   600    4520    1994   2.73   2.74      4   0.320     ok    ok    ok     5595
+   620    4526    1998   2.73   2.77      5   0.372     ok     -    ok     5731
+# [audit ok] sweep 625: S=2990.1939 matches recompute (drift 4.5e-13)
+   640    4500    2000   2.73   2.77      4   0.302     ok     -    ok     5866
+# [audit ok] sweep 650: S=3007.9636 matches recompute (drift 4.5e-13)
+   660    4546    1996   2.67   2.63      4   0.310     ok     -    ok     5999
+# [audit ok] sweep 675: S=3001.8739 matches recompute (drift 4.5e-13)
+   680    4564    2006   2.73   2.58      4   0.283     ok     -    ok     6146
+# [audit ok] sweep 700: S=2987.5021 matches recompute (drift 4.5e-13)
+   700    4500    2010   2.59   2.58      4   0.255     ok     -    ok     6298
+   720    4546    2008   2.62   2.71      4   0.225     ok     -    ok     6440
+# [audit ok] sweep 725: S=3023.3454 matches recompute (drift 9.1e-13)
+   740    4564    2004   2.75   2.52      4   0.209     ok     -    ok     6574
+# [audit ok] sweep 750: S=3001.5988 matches recompute (drift 4.5e-13)
+   760    4532    2016   2.77   2.56      5   0.214     ok     -    ok     6707
+# [audit ok] sweep 775: S=2955.3058 matches recompute (drift 4.5e-13)
+   780    4510    2004   2.67   2.75      5   0.237     ok     -    ok     6840
+# [audit ok] sweep 800: S=3017.9301 matches recompute (drift 4.5e-13)
+   800    4556    1990   2.70   2.73      5   0.225     ok    ok    ok     6993
+   820    4504    1994   2.70   2.62      5   0.186     ok     -    ok     7126
+# [audit ok] sweep 825: S=2952.2718 matches recompute (drift 4.5e-13)
+   840    4468    2000   2.71   2.42      6   0.182     ok     -    ok     7261
+# [audit ok] sweep 850: S=2970.6875 matches recompute (drift 4.5e-13)
+   860    4464    1996   2.77   2.45      6   0.308     ok     -    ok     7394
+# [audit ok] sweep 875: S=2958.2780 matches recompute (drift 4.5e-13)
+   880    4466    2006   2.70   2.17      5   0.232     ok     -    ok     7527
+# [audit ok] sweep 900: S=2886.8762 matches recompute (drift 4.5e-13)
+   900    4458    2004   2.63   2.27      6   0.319     ok     -    ok     7659
+   920    4440    2004   2.66   2.24      6   0.330     ok     -    ok     7790
+# [audit ok] sweep 925: S=2916.0739 matches recompute (drift 4.5e-13)
+   940    4482    2000   2.78   2.56      4   0.349     ok     -    ok     7921
+# [audit ok] sweep 950: S=2952.4032 matches recompute (drift 4.5e-13)
+   960    4456    2004   2.60   2.30      5   0.244     ok     -    ok     8058
+# [audit ok] sweep 975: S=2893.0008 matches recompute (drift 4.5e-13)
+   980    4452    2012   2.66   2.67      5   0.296     ok     -    ok     8197
+# [audit ok] sweep 1000: S=2936.0019 matches recompute (drift 4.5e-13)
+  1000    4436    2002   2.67   2.59      5   0.263     ok    ok    ok     8349
+  1020    4422    2008   2.73   2.44      6   0.280     ok     -    ok     8484
+# [audit ok] sweep 1025: S=2841.5499 matches recompute (drift 4.5e-13)
+  1040    4432    1992   2.63   2.49      4   0.382     ok     -    ok     8616
+# [audit ok] sweep 1050: S=2918.9367 matches recompute (drift 9.1e-13)
+  1060    4364    1992   2.71   2.43      4   0.312     ok     -    ok     8755
+# [audit ok] sweep 1075: S=2853.1785 matches recompute (drift 4.5e-13)
+  1080    4406    1996   2.73   2.16      6   0.274     ok     -    ok     8892
+# [audit ok] sweep 1100: S=2907.5191 matches recompute (drift 0.0e+00)
+  1100    4428    2006   2.66   2.36      6   0.316     ok     -    ok     9025
+  1120    4372    1998   2.78   2.31      6   0.327     ok     -    ok     9160
+# [audit ok] sweep 1125: S=2810.0527 matches recompute (drift 4.5e-13)
+  1140    4388    1992   2.64   2.75      5   0.328     ok     -    ok     9294
+# [audit ok] sweep 1150: S=2831.1441 matches recompute (drift 4.5e-13)
+  1160    4402    2006   2.69   2.50      6   0.317     ok     -    ok     9425
+# [audit ok] sweep 1175: S=2874.3231 matches recompute (drift 4.5e-13)
+  1180    4406    1996   2.74   2.24      7   0.343     ok     -    ok     9558
+# [audit ok] sweep 1200: S=2847.1746 matches recompute (drift 0.0e+00)
+  1200    4376    1994   2.69   2.57      4   0.348     ok    ok    ok     9708
+  1220    4418    2006   2.73   2.57      6   0.267     ok     -    ok     9841
+# [audit ok] sweep 1225: S=2920.8798 matches recompute (drift 4.5e-13)
+  1240    4436    1996   2.72   2.55      4   0.319     ok     -    ok     9975
+# [audit ok] sweep 1250: S=2908.4270 matches recompute (drift 4.5e-13)
+  1260    4476    2010   2.79   2.42      4   0.261     ok     -    ok    10108
+# [audit ok] sweep 1275: S=2870.6560 matches recompute (drift 4.5e-13)
+  1280    4394    1994   2.69   2.28      5   0.456     ok     -    ok    10243
+# [audit ok] sweep 1300: S=2822.3935 matches recompute (drift 9.1e-13)
+  1300    4340    1990   2.66   2.15      6   0.249     ok     -    ok    10375
+  1320    4344    2000   2.73   2.54      5   0.286     ok     -    ok    10508
+# [audit ok] sweep 1325: S=2818.5878 matches recompute (drift 9.1e-13)
+  1340    4408    1996   2.68   2.28      5   0.316     ok     -    ok    10640
+# [audit ok] sweep 1350: S=2904.3570 matches recompute (drift 9.1e-13)
+  1360    4436    2004   2.70   2.49      5   0.213     ok     -    ok    10772
+# [audit ok] sweep 1375: S=2891.4316 matches recompute (drift 4.5e-13)
+  1380    4376    1998   2.68   2.29      5   0.493     ok     -    ok    10906
+# [audit ok] sweep 1400: S=2898.9857 matches recompute (drift 4.5e-13)
+  1400    4392    1998   2.79   2.47      5   0.287     ok    ok    ok    11057
+  1420    4406    2000   2.72   2.54      5   0.313     ok     -    ok    11190
+# [audit ok] sweep 1425: S=2874.6317 matches recompute (drift 9.1e-13)
+  1440    4440    1998   2.64   2.50      5   0.310     ok     -    ok    11321
+# [audit ok] sweep 1450: S=2941.5245 matches recompute (drift 9.1e-13)
+  1460    4460    1994   2.73   2.38      5   0.348     ok     -    ok    11453
+# [audit ok] sweep 1475: S=2984.8369 matches recompute (drift 4.5e-13)
+  1480    4500    2002   2.81   2.43      6   0.295     ok     -    ok    11584
+# [audit ok] sweep 1500: S=2990.3525 matches recompute (drift 4.5e-13)
+  1500    4510    1998   2.64   2.71      5   0.262     ok     -    ok    11719
+  1520    4518    1998   2.69   2.71      5   0.295     ok     -    ok    11853
+# [audit ok] sweep 1525: S=2953.3833 matches recompute (drift 4.5e-13)
+  1540    4396    1996   2.71   2.39      5   0.320     ok     -    ok    11987
+# [audit ok] sweep 1550: S=2874.0132 matches recompute (drift 0.0e+00)
+  1560    4456    2008   2.80   2.60      5   0.341     ok     -    ok    12119
+# [audit ok] sweep 1575: S=2908.5222 matches recompute (drift 9.1e-13)
+  1580    4496    2004   2.70   2.49      5   0.299     ok     -    ok    12255
+# [audit ok] sweep 1600: S=2888.7062 matches recompute (drift 4.5e-13)
+  1600    4442    2006   2.72   2.57      5   0.326     ok    ok    ok    12407
+  1620    4502    2002   2.69   2.61      5   0.328     ok     -    ok    12540
+# [audit ok] sweep 1625: S=2958.1647 matches recompute (drift 4.5e-13)
+  1640    4546    1998   2.73   2.59      5   0.269     ok     -    ok    12677
+# [audit ok] sweep 1650: S=2955.6013 matches recompute (drift 9.1e-13)
+  1660    4444    2002   2.58   2.64      5   0.273     ok     -    ok    12818
+# [audit ok] sweep 1675: S=2959.7907 matches recompute (drift 4.5e-13)
+  1680    4524    2004   2.67   2.52      5   0.260     ok     -    ok    12953
+# [audit ok] sweep 1700: S=3005.6551 matches recompute (drift 4.5e-13)
+  1700    4562    1994   2.76   2.38      5   0.284     ok     -    ok    13086
+  1720    4562    2008   2.74   2.61      5   0.249     ok     -    ok    13219
+# [audit ok] sweep 1725: S=2970.8431 matches recompute (drift 9.1e-13)
+  1740    4566    1998   2.73   2.63      4   0.258     ok     -    ok    13354
+# [audit ok] sweep 1750: S=3074.1148 matches recompute (drift 9.1e-13)
+  1760    4638    1998   2.76   2.39      4   0.353     ok     -    ok    13488
+# [audit ok] sweep 1775: S=3021.6686 matches recompute (drift 4.5e-13)
+  1780    4560    1992   2.69   2.46      5   0.276     ok     -    ok    13624
+# [audit ok] sweep 1800: S=3014.0482 matches recompute (drift 4.5e-13)
+  1800    4566    2004   2.71   2.40      4   0.246     ok    ok    ok    13779
+  1820    4528    1996   2.84   2.81      4   0.304     ok     -    ok    13914
+# [audit ok] sweep 1825: S=2985.5715 matches recompute (drift 4.5e-13)
+  1840    4492    2000   2.79   2.90      5   0.323     ok     -    ok    14047
+# [audit ok] sweep 1850: S=2928.1106 matches recompute (drift 4.5e-13)
+  1860    4514    2008   2.70   2.53      5   0.270     ok     -    ok    14182
+# [audit ok] sweep 1875: S=2999.2143 matches recompute (drift 4.5e-13)
+  1880    4546    2016   2.74   2.76      4   0.247     ok     -    ok    14317
+# [audit ok] sweep 1900: S=3016.5267 matches recompute (drift 9.1e-13)
+  1900    4592    1998   2.72   2.47      5   0.317     ok     -    ok    14453
+  1920    4560    1994   2.73   2.31      5   0.263     ok     -    ok    14589
+# [audit ok] sweep 1925: S=3019.4460 matches recompute (drift 4.5e-13)
+  1940    4534    1994   2.83   2.42      5   0.304     ok     -    ok    14728
+# [audit ok] sweep 1950: S=3025.4241 matches recompute (drift 9.1e-13)
+  1960    4520    2002   2.75   2.51      5   0.236     ok     -    ok    14862
+# [audit ok] sweep 1975: S=2936.6280 matches recompute (drift 4.5e-13)
+  1980    4532    2002   2.71   2.46      5   0.258     ok     -    ok    14997
+# [audit ok] sweep 2000: S=3050.5194 matches recompute (drift 4.5e-13)
+  2000    4630    1998   2.78   2.47      5   0.301     ok    ok    ok    15155
+  2020    4538    1988   2.75   2.64      6   0.256     ok     -    ok    15290
+# [audit ok] sweep 2025: S=3041.1525 matches recompute (drift 4.5e-13)
+  2040    4642    1998   2.70   2.53      5   0.283     ok     -    ok    15425
+# [audit ok] sweep 2050: S=2980.0279 matches recompute (drift 0.0e+00)
+  2060    4594    1994   2.68   2.41      6   0.280     ok     -    ok    15558
+# [audit ok] sweep 2075: S=3056.8505 matches recompute (drift 4.5e-13)
+  2080    4566    2002   2.77   2.64      5   0.304     ok     -    ok    15696
+# [audit ok] sweep 2100: S=3066.9184 matches recompute (drift 9.1e-13)
+  2100    4630    2010   2.67   2.66      5   0.299     ok     -    ok    15835
+  2120    4592    1996   2.67   2.71      5   0.297     ok     -    ok    15975
+# [audit ok] sweep 2125: S=3068.1389 matches recompute (drift 4.5e-13)
+  2140    4588    2004   2.70   2.86      5   0.278     ok     -    ok    16110
+# [audit ok] sweep 2150: S=3038.7893 matches recompute (drift 0.0e+00)
+  2160    4628    1996   2.79   2.47      5   0.277     ok     -    ok    16244
+# [audit ok] sweep 2175: S=3084.1159 matches recompute (drift 4.5e-13)
+  2180    4636    2008   2.61   2.52      5   0.333     ok     -    ok    16376
+# [audit ok] sweep 2200: S=3109.4197 matches recompute (drift 4.5e-13)
+  2200    4676    1998   2.78   2.47      5   0.303     ok    ok    ok    16491
+  2220    4660    2008   2.78   2.52      5   0.368     ok     -    ok    16553
+# [audit ok] sweep 2225: S=3141.8420 matches recompute (drift 4.5e-13)
+  2240    4652    1996   2.85   2.69      5   0.234     ok     -    ok    16613
+# [audit ok] sweep 2250: S=3069.8767 matches recompute (drift 4.5e-13)
+  2260    4688    2002   2.71   2.64      5   0.267     ok     -    ok    16673
+# [audit ok] sweep 2275: S=3127.4368 matches recompute (drift 4.5e-13)
+  2280    4648    2010   2.70   2.20      5   0.342     ok     -    ok    16734
+# [audit ok] sweep 2300: S=3092.6414 matches recompute (drift 4.5e-13)
+  2300    4650    1998   2.69   2.19      5   0.348     ok     -    ok    16792
+  2320    4564    1996   2.72   2.61      4   0.216     ok     -    ok    16849
+# [audit ok] sweep 2325: S=3062.1107 matches recompute (drift 4.5e-13)
+  2340    4544    1998   2.73   2.58      4   0.222     ok     -    ok    16906
+# [audit ok] sweep 2350: S=3000.6054 matches recompute (drift 4.5e-13)
+  2360    4556    1982   2.62   2.37      5   0.251     ok     -    ok    16961
+# [audit ok] sweep 2375: S=3078.8338 matches recompute (drift 4.5e-13)
+  2380    4622    2002   2.81   2.27      5   0.305     ok     -    ok    17009
+# [audit ok] sweep 2400: S=3006.3572 matches recompute (drift 0.0e+00)
+  2400    4578    1986   2.67   2.34      5   0.275     ok    ok    ok    17063
+  2420    4562    1990   2.55   2.40      5   0.299     ok     -    ok    17109
+# [audit ok] sweep 2425: S=3047.2375 matches recompute (drift 9.1e-13)
+  2440    4636    2012   2.73   2.32      5   0.251     ok     -    ok    17144
+# [audit ok] sweep 2450: S=3115.0106 matches recompute (drift 4.5e-13)
+  2460    4670    1996   2.63   2.28      4   0.310     ok     -    ok    17173
+# [audit ok] sweep 2475: S=3151.4966 matches recompute (drift 4.5e-13)
+  2480    4750    1998   2.71   2.37      4   0.293     ok     -    ok    17190
+# [audit ok] sweep 2500: S=3212.0623 matches recompute (drift 4.5e-13)
+  2500    4748    1998   2.76   2.19      6   0.267     ok     -    ok    17205
+# FINAL verify: ok=True  gluing_ok=True  links=0  simplicial=True  chi=0  n_tets=11870 (expect 11870)  connected=True
+# FINAL foliation: slice-triangle incidence {2: 1998} (all-2 = closed 3-manifold slices)  same-side tets=0  => CLEAN (standard CDT ensemble)
+
+================================================================
+  WITH-THEORY (CLOSURE) RESULT -- compare to bare + placebo arms
+================================================================
+  beta=0.25  eta=0.0298668  lambda_inj=3.0  placebo=False  mu=3.4447071015394344
+  manifold check: PASS  [links=0]   foliation: CLEAN
+  final N4=4748  N41=1998
+  d_H = 2.76   rails: 2t=1.89 3t=2.60 4t=3.00
+  blob score = 2.19   active slices = 6/16   max slice = 274
+  cos^3 fit: width=3.4  rel.RMS err=0.267
+  closure term: <E>/tet=2.8577  std=1.8247  tets with label collision: 0.415  (n_tets=999)
+  (read against the beta=0 control and the --placebo arm at the same beta; only a real-vs-placebo difference is closure physics.)

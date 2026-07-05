@@ -1,0 +1,12 @@
+# [stage4] pinned ladder {1: 39, 2: 39, 3: 39, 6: 39} across 80 slices (sep >= 6)
+# sweep 500/4000  <f>=7.4198  (conservation ok)
+# sweep 1000/4000  <f>=7.4198  (conservation ok)
+# sweep 1500/4000  <f>=7.4198  (conservation ok)
+# sweep 2000/4000  <f>=7.4198  (conservation ok)
+# sweep 2500/4000  <f>=7.4198  (conservation ok)
+# sweep 3000/4000  <f>=7.4198  (conservation ok)
+# sweep 3500/4000  <f>=7.4198  (conservation ok)
+# sweep 4000/4000  <f>=7.4198  (conservation ok)
+
+# STAGE 4 RUN DONE -> cap_run.csv
+# analyze:  python v6_capacity_run.py --analyze cap_run
