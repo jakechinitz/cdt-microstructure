@@ -12,32 +12,45 @@ anchored to the earlier PC session's pace at N41=20000.
 
 ---
 
-## 1. Stage-4 v1.1 (T3/T4 gates) — ~6–12 h
+## 1. Stage-4 v1.2 (T3/T4 gates) — ~6–12 h — SUPERSEDES the v1.1 run
+
+The v1.1 run's T4 "screening" verdict (xi ~ 1.6) measured TWO artifacts,
+both now fixed (see the addendum in CAPACITY_CONSERVATION.md):
+
+- **The rectifier (the big one).** Vacuum n_coll is 92% zero / 8% one, so
+  `max(0, n_coll - nbar)` removes only ~8% of vacuum absorption: the v1.1
+  "excess" mode had intrinsic xi = sqrt(D/(kappa*0.071)) ~ 7.5 BY
+  CONSTRUCTION. Fix: absorption is driven by the PERSISTENT failure
+  average (`--persist`, EWMA, default 200 sweeps; rectified vacuum rate
+  falls ~1/sqrt(W), pushing intrinsic xi to ~23) — theory-faithful, since
+  the paper defines mass as persistent closure failure and the vacuum's
+  flicker turnover is already the anchor budget, not commitment.
+- **Deficit reference.** Deficits are now measured against the same-slice
+  far field (new `far_f` CSV column), removing the closed-slice zero-mode
+  surplus that steepened the v1.1 fit (and explains measured 1.6 < 7.5);
+  the analyzer prints the level-0 dressing profile with sign (v1.1's
+  d=1 elevation to 7.76 is a real under-absorption surplus, expected to
+  collapse under v1.2). Verified on synthetic data with both
+  contaminations planted: true 1/d recovered exactly, gate PASS.
 
 ```
-python v6_capacity_run.py --resume clo_b1.0_20k.json \
-    --absorb excess --pins-per-level 25 --sweeps 4000 \
-    --out cap_v11 > logs/cap_v11.log 2>&1
-python v6_capacity_run.py --analyze cap_v11
+python v6_capacity_run.py --resume clo_b1.0_20k_K40.json \
+    --absorb excess --persist 200 --pins-per-level 25 --sweeps 4000 \
+    --out cap_v12 > logs/cap_v12.log 2>&1
+python v6_capacity_run.py --analyze cap_v12
 ```
 
-Notes from the audit (both fixed in code, defaults are now safe):
-- In `--absorb excess` mode absorption is now OFF during therm (field held
-  exactly at the vacuum anchor) and measurements start only after a field
-  burn-in (`--post-therm`, default = therm). Without this, the screened
-  therm-transient contaminated the profile and biased T4 toward a FALSE
-  screening verdict.
-- The analyzer now computes T3 (power fit; massless Green ~ d^-1) and T4
-  (screening slope; gate = consistent with zero) itself, verified on
-  synthetic Coulomb (recovers -1.00, PASS) and Yukawa xi=2 (recovers 2.0,
-  FAIL).
-- Usable shell range is capped by the slice radius (~125 cells/slice at
-  20k/K=80); if T3/T4 report "insufficient range", raise N41 or lower K
-  before reading anything into it.
+Run it on a **K=40 base** (thicker slices, usable radius ~7-8 vs ~5): grow
+`scan_20000_causal_K40.json` bare, thermalize a beta=1 closure arm on it,
+resume from that. With intrinsic xi ~ 23 >> radius ~ 8, a screened verdict
+at xi ~ radius is now REAL physics against Route B, and a flat
+ln(deficit*d) out to the radius is an honest T4 PASS. v1.1's M1/M2 remain
+claim-grade (near-field sink quantities, insensitive to the far-field
+artifacts), though M2's absolute value will shift under v1.2.
 
 Gates: T1 conservation exact (run aborts otherwise); T2 <f> at 7.4198;
 M1 dressing-subtracted proportionality; M2 junction constancy; T3 ~ d^-1;
-T4 massless.
+T4 massless over the measurable range.
 
 ## 2. Stage-3 replication seeds — ~4–8 h per seed-pair
 
