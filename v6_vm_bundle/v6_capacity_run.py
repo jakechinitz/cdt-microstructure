@@ -33,9 +33,22 @@ MODEL P (declared forks):
     of the paper's static branch is spatial); transport ONLY within slices.
   * per sweep: (i) one label heat-bath pass (beta-consistent, pins frozen);
     (ii) transport f' = f + D * sum_faces (f_y - f_x), D <= 1/4;
-    (iii) absorption dA_x = kappa * n_coll(x) * f_x, recycled uniformly
+    (iii) absorption dA_x = kappa * rate_x * f_x, recycled uniformly
     within the slice the same sweep (steady state possible on a closed
-    manifold).
+    manifold). In --absorb excess mode the rate is computed from the
+    PERSISTENT failure average A_x (EWMA over --persist sweeps):
+    rate = max(0, A_x - nbar - margin). Rationale (v1.2): the vacuum's
+    instantaneous n_coll is ~92% zero / ~8% one, so max(0, n_coll - nbar)
+    rectifies the fluctuations and removes only ~8% of the vacuum
+    absorption (rect = 0.071 vs nbar = 0.077 at the theory point) --
+    giving the vacuum an intrinsic screening length
+    xi = sqrt(D/(kappa*rect)) ~ 7.5 steps BY CONSTRUCTION. The v1.1 T4
+    'screening' verdict measured that implementation artifact, not the
+    theory. The paper defines mass as PERSISTENT closure failure, so
+    maintenance is drawn on the time-averaged failure: the window
+    suppresses the rectified vacuum rate ~1/sqrt(W) (W=200 -> xi ~ 23)
+    while committed cells (pins and their persistently-driven shells)
+    keep their full rate.
   * GEOMETRY FROZEN in v1 (labels dynamical, Pachner moves off): isolates
     the field physics; conservative field transport across moves is the
     documented v2 extension.
@@ -128,7 +141,7 @@ def bfs_dist(adj, src, cap=10**9):
 
 
 CSV_FIELDS = ["sweep", "level", "pin_id", "shell", "n_cells", "mean_f",
-              "Q_pin"]
+              "Q_pin", "far_f"]
 
 
 def main():
@@ -159,6 +172,15 @@ def main():
                          "xi = sqrt(D/(kappa*<n_coll>_vac)) ~ 5-7 steps (this "
                          "quantitatively explains the v1 run's observed 4-5 "
                          "step range and its M1 offset b~0.4).")
+    ap.add_argument("--persist", type=int, default=200,
+                    help="persistence window (EWMA sweeps) for the failure "
+                         "average that drives absorption in excess mode; "
+                         "1 = instantaneous (v1.1 behavior, intrinsic "
+                         "xi ~ 7.5 -- see the module docstring)")
+    ap.add_argument("--commit-margin", type=float, default=0.0,
+                    help="optional threshold above nbar before a cell's "
+                         "persistent failure draws maintenance (strict "
+                         "commitment reading; 0 = soft persistence only)")
     ap.add_argument("--sweeps", type=int, default=4000)
     ap.add_argument("--therm", type=int, default=400,
                     help="sweeps before measurements (field equilibration)")
@@ -232,12 +254,20 @@ def main():
         (args.therm if args.absorb == "excess" else 0)
     meas_start = args.therm + post
     print(f"# [stage4] measurement window: sweeps {meas_start + 1}.."
-          f"{args.sweeps}  (therm {args.therm} + field burn-in {post})",
+          f"{args.sweeps}  (therm {args.therm} + field burn-in {post}; "
+          f"persist {args.persist}, margin {args.commit_margin})",
           flush=True)
+    if args.absorb == "excess" and meas_start < 3 * args.persist:
+        print(f"# !! therm+post-therm ({meas_start}) < 3*persist "
+              f"({3 * args.persist}): the persistence average may not have "
+              f"converged when measurements start -- raise --therm/"
+              f"--post-therm or lower --persist", flush=True)
 
     # --- field init (vacuum anchor T2) --------------------------------------
     f = {t: np.full(len(sl["tets"]), G_SHARE_EFF) for t, sl in slices.items()}
     tot0 = sum(v.sum() for v in f.values())
+    # persistent failure average (EWMA), builds from sweep 1
+    A = {t: np.zeros(len(sl["tets"])) for t, sl in slices.items()}
 
     # precompute BFS shells around each pin
     shells = []
@@ -286,13 +316,16 @@ def main():
                     flux[i] += ff[j] - ff[i]
             ff = ff + args.D * flux
             ncol = n_coll_vec(sl, labels, Etab)
+            A[t] += (ncol - A[t]) / args.persist
             if args.absorb == "excess":
                 # no absorption during therm: the field stays exactly at the
                 # uniform vacuum anchor while nbar accumulates (nbar is a
                 # label-side statistic, independent of f), so the massless
-                # profile builds from a clean initial condition
-                rate = (np.maximum(0.0, ncol - nbar_now) if sw > args.therm
-                        else np.zeros_like(ncol))
+                # profile builds from a clean initial condition. Rate is
+                # driven by the PERSISTENT average A, not instantaneous
+                # n_coll -- see the docstring (v1.2 rectifier fix).
+                rate = (np.maximum(0.0, A[t] - nbar_now - args.commit_margin)
+                        if sw > args.therm else np.zeros_like(ncol))
             else:
                 rate = ncol
             absorb = args.kappa * rate * ff
@@ -308,16 +341,22 @@ def main():
             Q_n += 1
             for pid, (lvl, t, c, d) in enumerate(shells):
                 sl = slices[t]
-                ncol = n_coll_vec(sl, labels, Etab)
                 # flux drawn by the pin + its immediate shell (emergent Q),
                 # measured with the SAME rate law as the dynamics
                 near = (d >= 0) & (d <= 1)
                 if args.absorb == "excess":
-                    rate_n = np.maximum(0.0, ncol[near] - nbar_now)
+                    rate_n = np.maximum(0.0, A[t][near] - nbar_now
+                                        - args.commit_margin)
                 else:
-                    rate_n = ncol[near]
+                    rate_n = n_coll_vec(sl, labels, Etab)[near]
                 Q = float((args.kappa * rate_n * f[t][near]).sum())
                 Q_acc[pid] += Q
+                # same-slice far-field reference: removes the closed-slice
+                # zero mode (recycled capacity elevates the far field) from
+                # the deficit definition in the analyzer
+                farm = pin_far.get(t)
+                far_f = (round(float(f[t][farm].mean()), 6)
+                         if farm is not None and farm.any() else "")
                 for sh in range(1, args.rmax + 1):
                     m = d == sh
                     if m.any():
@@ -325,7 +364,7 @@ def main():
                             "sweep": sw, "level": lvl, "pin_id": pid,
                             "shell": sh, "n_cells": int(m.sum()),
                             "mean_f": round(float(f[t][m].mean()), 6),
-                            "Q_pin": round(Q, 6)})
+                            "Q_pin": round(Q, 6), "far_f": far_f})
             csv_f.flush()
         if sw % 500 == 0:
             print(f"# sweep {sw}/{args.sweeps}  <f>="
@@ -341,15 +380,23 @@ def analyze(prefix):
     rows = list(csv.DictReader(open(prefix + ".csv")))
     if not rows:
         sys.exit("no rows")
-    # deficit profile per level + emergent Q per level
-    prof = defaultdict(list)                 # (level, shell) -> mean_f
+    # deficit profile per level + emergent Q per level. Deficits are taken
+    # against the SAME-SLICE far field when the CSV carries it (v1.2+;
+    # removes the closed-slice zero mode), else against the vacuum anchor.
+    def ref_of(r):
+        v = r.get("far_f")
+        return float(v) if v not in (None, "") else G_SHARE_EFF
+    prof = defaultdict(list)                 # (level, shell) -> deficit
     Qs = defaultdict(list)                   # level -> Q per measurement
     for r in rows:
-        prof[(int(r["level"]), int(r["shell"]))].append(float(r["mean_f"]))
+        prof[(int(r["level"]), int(r["shell"]))].append(
+            ref_of(r) - float(r["mean_f"]))
         if int(r["shell"]) == 1:
             Qs[int(r["level"])].append(float(r["Q_pin"]))
     levels = sorted({int(r["level"]) for r in rows})
     shells = sorted({int(r["shell"]) for r in rows})
+    print("shell DEFICITS (reference: same-slice far field when available; "
+          "negative = elevation above it)")
     print(f"{'level':>6} " + "".join(f"{'d=%d' % s:>12}" for s in shells)
           + f" {'Q (emergent)':>14}")
     far = {}
@@ -390,9 +437,9 @@ def analyze(prefix):
     # Level 0 is the dressing baseline, not a mass -- excluded; both deficit
     # and flux are dressing-subtracted when the level-0 rung is present.
     b0 = far[0][1] if 0 in far else 0.0
-    d0 = (G_SHARE_EFF - far[0][0]) if 0 in far else 0.0
+    d0 = far[0][0] if 0 in far else 0.0
     lv = [l for l in levels if l > 0]
-    d1 = np.array([(G_SHARE_EFF - far[l][0]) - d0 for l in lv])
+    d1 = np.array([far[l][0] - d0 for l in lv])
     qq = np.array([far[l][1] - b0 for l in lv])
     good = qq > 1e-9
     if good.any():
@@ -408,17 +455,21 @@ def analyze(prefix):
     late = defaultdict(list)
     for r in rows:
         if int(r["sweep"]) >= lo:
-            late[(int(r["level"]), int(r["shell"]))].append(float(r["mean_f"]))
-    base = ({sh: G_SHARE_EFF - float(np.mean(late[(0, sh)]))
+            late[(int(r["level"]), int(r["shell"]))].append(
+                ref_of(r) - float(r["mean_f"]))
+    base = ({sh: float(np.mean(late[(0, sh)]))
              for sh in shells if late.get((0, sh))} if 0 in levels else {})
+    if base:
+        print("level-0 dressing profile (deficit; negative = elevation): "
+              + "  ".join(f"d={sh}: {v:+.4f}" for sh, v in sorted(base.items())))
     shape = {}
     for sh in shells:
         vals = []
         for l in lv:
             v, v1 = late.get((l, sh)), late.get((l, 1))
             if v and v1:
-                dsh = G_SHARE_EFF - float(np.mean(v)) - base.get(sh, 0.0)
-                d1 = G_SHARE_EFF - float(np.mean(v1)) - base.get(1, 0.0)
+                dsh = float(np.mean(v)) - base.get(sh, 0.0)
+                d1 = float(np.mean(v1)) - base.get(1, 0.0)
                 if d1 > 1e-12:
                     vals.append(dsh / d1)
         if vals:

@@ -136,3 +136,50 @@ above 7.4198 on a closed slice (absorbed capacity has nowhere else to go)
 throughout. v2 extension (documented, not built): conservative field
 redistribution through Pachner moves via the change-log, enabling
 geometry-dynamical stage-4 runs.
+
+## 7. v1.2 addendum: the rectifier artifact and the persistence fix
+
+The v1.1 production run (20k, --absorb excess) returned T4 = screened at
+xi ~ 1.6 steps. Diagnosis before interpretation: the "excess" rate
+max(0, n_coll - nbar) RECTIFIES vacuum fluctuations. At the theory point
+the vacuum's n_coll distribution is P(0)=0.923, P(1)=0.077 (single-cell
+Gibbs, beta=1), so nbar = 0.077 and
+
+    E[max(0, n_coll - nbar)] = 0.071   (92% of the vacuum absorption kept)
+
+-- the subtraction of a small mean from a distribution concentrated at
+zero removes almost nothing. The v1.1 spec therefore had an intrinsic
+screening length xi = sqrt(D/(kappa*0.071)) ~ 7.5 steps BY CONSTRUCTION:
+T4 measured the implementation, not the theory. The measured 1.6 < 7.5 is
+the additional bias from (a) the closed-slice zero mode (recycling puts
+the far field ABOVE the anchor, so anchor-referenced deficits vanish and
+go negative early, steepening log-fits) and (b) the level-0 dressing
+having the OPPOSITE sign to the assumption (frozen injective faces
+SUPPRESS neighbor collisions below vacuum -> under-absorption -> local
+surplus, f = 7.76 at d=1): subtracting an elevation inflates the
+short-range deficit shape.
+
+The fix is the theory's own language: mass is PERSISTENT closure failure,
+and the vacuum's flicker turnover is already the anchor budget
+(g_share = 7.4198), not commitment -- charging maintenance on flickers
+double-counts it. v1.2 drives absorption with the EWMA failure average
+A_x over --persist W sweeps: rate = max(0, A_x - nbar - margin). The
+rectified vacuum rate falls ~1/sqrt(W):
+
+    W =   1: rect = 0.071  ->  xi ~  7.5   (v1.1)
+    W =  50: rect = 0.015  ->  xi ~ 16
+    W = 200: rect = 0.008  ->  xi ~ 23     (v1.2 default)
+
+while pins (A = 1..6) and their persistently-driven shells keep their
+full rate. Deficits are now referenced to the same-slice far field
+(far_f column), removing the zero mode exactly; the level-0 profile is
+printed with sign. Analyzer verified on synthetic data with both
+contaminations planted: true 1/d recovered (T3 = -1.00, T4 PASS), planted
+Yukawa xi=2 still correctly FAILS.
+
+Decision tree for the v1.2 K=40 rerun (intrinsic xi ~ 23 >> radius ~ 8):
+flat ln(deficit*d) to the radius = honest T4 PASS; screening at
+xi ~ radius that SURVIVES these fixes = a real result against the
+massless carrier, to be reported as such. Pre-registered side prediction:
+the level-0 elevation (7.76) should collapse toward the far field under
+v1.2, since a vacuum that no longer absorbs has nothing to under-absorb.
