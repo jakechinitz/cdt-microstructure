@@ -117,13 +117,32 @@ python v6_closure_run.py --local-closure --beta-closure 0.0 \
 The beta=0 fixed-engine control row for the comparison tables (exact-bare
 by construction: uniform births are detailed-balanced at beta=0).
 
-## 6. Rung-2 curvature displacement — BLOCKED on #4
+## 6. Rung-2 curvature displacement — script READY; launch after the
+##    volume-pair verdict confirms the boundary region
 
-Needs the phase boundary located by the grid first. Then: bare vs
-beta=1-coupled arms straddling the boundary; prediction c0 ~ +0.019
-(closure) / ~0.08 per cell (seven-channel field) as a boundary shift.
-Pre-registered in induced_couplings.py + paper J.4; no script yet — write
-it against the measured boundary geometry when #4 lands.
+```
+python rung2_boundary.py --predict            # c0 predictions on record
+python rung2_boundary.py --k0-list "2.0 2.2 2.4 2.6 2.8 3.0 3.2 3.4" \
+    --Delta 0.4 --seeds 3 --sweeps 800 --jobs 4 --out rung2.csv
+python rung2_boundary.py --analyze rung2.csv
+```
+
+The test: in bare-k0 coordinates the coupled ensemble's boundary must
+shift by +c0*r (c0_real = +0.0187/slice-edge, r = N1/N0 measured from the
+runs, ~ +0.12 at r~6.5) while the PLACEBO arm's boundary must not move
+(c0_plc = +0.0003, seventy times smaller despite a LARGER volume-sector
+coefficient — the shuffle destroys structure, and only structure prices
+curvature). Structure-vs-magnitude, where the bridge family tested
+magnitude. Per (k0, seed): k4 tuned on bare bursts, then bare/real/placebo
+arms share the tuned checkpoint and k4; centering removes the volume tilt,
+so only the curvature sector can move the crossing.
+
+Verified on synthetic scans: planted shifts +0.12/+0.002 recovered at
++0.107/+0.007 with 3 seeds (resolution ~0.015 vs the 0.12 signal, ~8:1).
+Cost: 8 k0 x 3 seeds x (tune + 3x800 sweeps) at 10k volume ~ 2-3x the
+tuned grid, 1-2 days at --jobs 4. Gates: real shift at prediction, placebo
+consistent with zero, foliation CLEAN, shared tuned k4 per point.
+CSV is append-safe (rerun to resume).
 
 ---
 
