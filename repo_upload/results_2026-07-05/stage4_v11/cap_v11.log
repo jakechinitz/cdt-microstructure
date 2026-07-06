@@ -1,0 +1,14 @@
+# [stage4] pinned ladder {0: 32, 1: 31, 2: 31, 3: 31, 6: 31} across 80 slices (sep >= 6)
+# [stage4] measurement window: sweeps 801..4000  (therm 400 + field burn-in 400)
+# [stage4] vacuum baseline <n_coll> = 0.0794  (absorb mode: excess)
+# sweep 500/4000  <f>=7.4198  (conservation ok)
+# sweep 1000/4000  <f>=7.4198  (conservation ok)
+# sweep 1500/4000  <f>=7.4198  (conservation ok)
+# sweep 2000/4000  <f>=7.4198  (conservation ok)
+# sweep 2500/4000  <f>=7.4198  (conservation ok)
+# sweep 3000/4000  <f>=7.4198  (conservation ok)
+# sweep 3500/4000  <f>=7.4198  (conservation ok)
+# sweep 4000/4000  <f>=7.4198  (conservation ok)
+
+# STAGE 4 RUN DONE -> cap_v11.csv
+# analyze:  python v6_capacity_run.py --analyze cap_v11

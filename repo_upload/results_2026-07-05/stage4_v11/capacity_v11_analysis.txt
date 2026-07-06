@@ -1,0 +1,21 @@
+ level          d=1         d=2         d=3         d=4         d=5   Q (emergent)
+     0       7.7632      7.7233      7.6440      7.5701      7.4687     0.1075 ±0.0013
+     1       6.9600      7.1545      7.2914      7.3841      7.4516     0.3994 ±0.0012
+     2       6.4684      6.8395      7.1529      7.3607      7.4705     0.6396 ±0.0011
+     3       6.1654      6.6837      7.1297      7.3725      7.4208     0.8357 ±0.0012
+     6       5.1238      6.0181      6.6284      7.1444      7.4600     1.0728 ±0.0014
+
+M1 sink linearity (affine):       Q = 0.1552*m + 0.2385  (max rel. residual 0.123)
+M1 sink linearity (proportional): Q = 0.2125*m           (max rel. residual 0.200)
+M1 DRESSING-SUBTRACTED (the claim): Q - Q(0) = 0.1867*m  (dressing baseline Q(0) = 0.1075; max rel. residual 0.174)
+M2 junction (dressing-subtracted shell-1 deficit per unit Q): 2.5284 ± 0.2308  across levels (constancy across the ladder = the lattice-G statement)
+
+T3/T4 deficit shape (dressing-subtracted, normalized to shell 1, pooled over levels > 0, late half):
+  d=1:  +1.0000 ± 0.0000
+  d=2:  +0.6711 ± 0.0124
+  d=3:  +0.3802 ± 0.0204
+  d=4:  +0.1678 ± 0.0189
+  d=5:  +0.0120 ± 0.0064
+T3 profile form: deficit ~ d^(-2.28 ± 0.91)   (massless graph Green function on a 3-slice: ~ -1, with flattening at the slice radius)
+T4 screening:    d ln(deficit*d)/dd = -0.6319 ± 0.2961 -- xi = 1.6 steps: SCREENED (Route-A leak, or buildup transient if --post-therm was small): gate FAIL
+  caveats: the closed-slice zero mode elevates the far field, so negative-shape shells are excluded from the fits; quoted errors ignore sweep autocorrelation (thin with --measure-every if in doubt); usable range is capped by the slice radius -- check n_cells per shell in the CSV.

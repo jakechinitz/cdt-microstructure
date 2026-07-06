@@ -1,0 +1,23 @@
+=== pooled defect (seed0 + seed1) === 
+      kind shell               mean_E                coll              mean_q             shell_n
+    closed     1       1.7288 ±0.0008      0.0792 ±0.0003      5.3144 ±0.0013      4.0000 ±0.0000
+    closed     2       1.7303 ±0.0006      0.0792 ±0.0002      5.6113 ±0.0009      7.1641 ±0.0030
+    closed     3       1.7286 ±0.0005      0.0790 ±0.0002      5.6847 ±0.0009     11.0715 ±0.0052
+      fail     1       1.6784 ±0.0007      0.0691 ±0.0002      5.3378 ±0.0009      4.0000 ±0.0000
+      fail     2       1.7324 ±0.0006      0.0790 ±0.0002      5.6269 ±0.0011      7.2030 ±0.0025
+      fail     3       1.7276 ±0.0005      0.0788 ±0.0002      5.6889 ±0.0010     11.2108 ±0.0050
+   virtual     1       1.7323 ±0.0008      0.0802 ±0.0003      5.3055 ±0.0013      4.0000 ±0.0000
+   virtual     2       1.7299 ±0.0006      0.0793 ±0.0002      5.5904 ±0.0010      7.2604 ±0.0040
+   virtual     3       1.7291 ±0.0005      0.0790 ±0.0002      5.7097 ±0.0009     10.9361 ±0.0082
+
+READ: real vs placebo at each shell = the closure-failure effect (anchoring subtracted);
+      real vs virtual = total effect; decay with shell = the strain profile.
+ 
+=== bridge family vs pre-registered predictions === 
+# skip (no bridge tag): logs/bridge_b*_2k.log
+   table   beta       eps   N41_cen   N41_unc  measured   pre-reg     exact  ratio
+# 'pre-reg' = predictor-CSV value (independent TI, on record before launch); 'exact' = -beta*mu_arm/(4*eps) using the mu the centered arm actually subtracted (its own log) -- the pair difference isolates exactly that constant, so ratio uses it.
+# gates: ratio ~ 1 across the family; concave beta-curve (S1); 1/eps collapse (S2); placebo tracks mu_plc, not mu_real (S3).
+ 
+=== tuned grid heatmaps === 
+wrote grid10k_tuned.png
