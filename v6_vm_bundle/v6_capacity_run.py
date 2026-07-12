@@ -377,45 +377,72 @@ def main():
 
 
 def analyze(prefix):
+    """Errors: within-pin series are autocorrelation-corrected (Sokal
+    tau_int); level values combine pins by ACROSS-PIN scatter (pins are
+    well-separated, hence independent). See autocorr.py."""
+    from autocorr import mean_err, combine_arms
     rows = list(csv.DictReader(open(prefix + ".csv")))
     if not rows:
         sys.exit("no rows")
+    rows.sort(key=lambda r: int(r["sweep"]))
     # deficit profile per level + emergent Q per level. Deficits are taken
     # against the SAME-SLICE far field when the CSV carries it (v1.2+;
     # removes the closed-slice zero mode), else against the vacuum anchor.
     def ref_of(r):
         v = r.get("far_f")
         return float(v) if v not in (None, "") else G_SHARE_EFF
-    prof = defaultdict(list)                 # (level, shell) -> deficit
-    Qs = defaultdict(list)                   # level -> Q per measurement
+    prof_pin = defaultdict(list)             # (level, pin, shell) -> series
+    Q_pin = defaultdict(list)                # (level, pin) -> Q series
     for r in rows:
-        prof[(int(r["level"]), int(r["shell"]))].append(
-            ref_of(r) - float(r["mean_f"]))
-        if int(r["shell"]) == 1:
-            Qs[int(r["level"])].append(float(r["Q_pin"]))
+        lvl, pid, sh = int(r["level"]), int(r["pin_id"]), int(r["shell"])
+        prof_pin[(lvl, pid, sh)].append(ref_of(r) - float(r["mean_f"]))
+        if sh == 1:
+            Q_pin[(lvl, pid)].append(float(r["Q_pin"]))
     levels = sorted({int(r["level"]) for r in rows})
     shells = sorted({int(r["shell"]) for r in rows})
+
+    def level_shell(lvl, sh):
+        """Across-pin (mean, sem) of per-pin mean deficits at (lvl, sh)."""
+        ms = [mean_err(v)[0] for (l, p, s), v in prof_pin.items()
+              if l == lvl and s == sh]
+        return combine_arms(ms)
+
+    def level_Q(lvl):
+        """Across-pin (mean, sem, median tau) of per-pin mean Q at lvl."""
+        st = [mean_err(v) for (l, p), v in Q_pin.items() if l == lvl]
+        m, e = combine_arms([s[0] for s in st])
+        taus = [s[2] for s in st if np.isfinite(s[2])]
+        return m, e, (float(np.median(taus)) if taus else float("nan"))
+
+    n_pins = {lvl: sum(1 for (l, _) in Q_pin if l == lvl) for lvl in levels}
     print("shell DEFICITS (reference: same-slice far field when available; "
           "negative = elevation above it)")
+    print("errors: across-pin scatter; tau = median within-pin IAT of Q "
+          f"(pins/level: { {l: n_pins[l] for l in levels} })")
     print(f"{'level':>6} " + "".join(f"{'d=%d' % s:>12}" for s in shells)
-          + f" {'Q (emergent)':>14}")
+          + f" {'Q (emergent)':>18} {'tau':>6}")
     far = {}
+    ferr = {}
     for lvl in levels:
         cells = []
         for sh in shells:
-            v = np.array(prof[(lvl, sh)])
-            cells.append(f"{v.mean():>12.4f}")
-        q = np.array(Qs[lvl])
-        far[lvl] = (np.array(prof[(lvl, shells[0])]).mean(),
-                    q.mean())
+            m, e = level_shell(lvl, sh)
+            cells.append(f"{m:>12.4f}")
+        d1m, d1e = level_shell(lvl, shells[0])
+        qm, qe, qtau = level_Q(lvl)
+        far[lvl] = (d1m, qm)
+        ferr[lvl] = (d1e, qe)
+        qe_txt = f"±{qe:.4f}" if np.isfinite(qe) else "±  --"
         print(f"{lvl:>6} " + "".join(cells)
-              + f" {q.mean():>10.4f} ±{q.std()/max(1,len(q))**0.5:.4f}")
+              + f" {qm:>10.4f} {qe_txt:>7} {qtau:>6.1f}")
     # M1: sink linearity  Q(level) ~ a*level + b, plus the proportional fit
     # (the paper's maintenance postulate wants Q proportional to commitment;
     # in --absorb excess mode b should be consistent with 0, in total mode
     # b is the vacuum-baseline absorption of the pin zone)
     ls = np.array(levels, float)
     qs = np.array([far[l][1] for l in levels])
+    qe = np.array([ferr[l][1] if np.isfinite(ferr[l][1]) else 0.0
+                   for l in levels])
     a, b = np.polyfit(ls, qs, 1)
     resid = float(np.abs(qs - (a * ls + b)).max() / max(qs.max(), 1e-12))
     a0 = float((qs * ls).sum() / (ls * ls).sum())
@@ -425,14 +452,20 @@ def analyze(prefix):
     print(f"M1 sink linearity (proportional): Q = {a0:.4f}*m           "
           f"(max rel. residual {resid0:.3f})")
     if 0 in far:
-        b0 = far[0][1]
+        b0, b0e = far[0][1], (ferr[0][1] if np.isfinite(ferr[0][1]) else 0.0)
         m_pos = ls > 0
         qc = qs[m_pos] - b0
+        qce = np.sqrt(qe[m_pos] ** 2 + b0e ** 2)
         lp = ls[m_pos]
         ac = float((qc * lp).sum() / (lp * lp).sum())
+        # slope error: weighted proportional fit through the origin
+        ace = (float(np.sqrt((qce ** 2 * lp ** 2).sum()) / (lp * lp).sum())
+               if np.all(np.isfinite(qce)) else float("nan"))
         rc = float(np.abs(qc - ac * lp).max() / max(abs(qc).max(), 1e-12))
-        print(f"M1 DRESSING-SUBTRACTED (the claim): Q - Q(0) = {ac:.4f}*m  "
-              f"(dressing baseline Q(0) = {b0:.4f}; max rel. residual {rc:.3f})")
+        ace_txt = f" ± {ace:.4f}" if np.isfinite(ace) else ""
+        print(f"M1 DRESSING-SUBTRACTED (the claim): Q - Q(0) = "
+              f"{ac:.4f}{ace_txt}*m  (dressing baseline Q(0) = {b0:.4f}; "
+              f"max rel. residual {rc:.3f})")
     # M2 junction: shell-1 deficit per unit emergent Q (lattice-G analog).
     # Level 0 is the dressing baseline, not a mass -- excluded; both deficit
     # and flux are dressing-subtracted when the level-0 rung is present.
@@ -444,49 +477,94 @@ def analyze(prefix):
     good = qq > 1e-9
     if good.any():
         Gl = (d1[good] / qq[good])
+        # per-level propagated error (deficit and flux errors in quadrature,
+        # relative), then the larger of propagation and across-level scatter
+        d0e = ferr[0][0] if 0 in far and np.isfinite(ferr[0][0]) else 0.0
+        b0e = ferr[0][1] if 0 in far and np.isfinite(ferr[0][1]) else 0.0
+        rel = []
+        for i, l in enumerate(np.array(lv)[good]):
+            de = np.sqrt((ferr[l][0] if np.isfinite(ferr[l][0]) else 0.0) ** 2
+                         + d0e ** 2)
+            qe_l = np.sqrt((ferr[l][1] if np.isfinite(ferr[l][1]) else 0.0) ** 2
+                           + b0e ** 2)
+            dd, qv = d1[good][i], qq[good][i]
+            if abs(dd) > 1e-12 and qv > 1e-12:
+                rel.append(np.sqrt((de / dd) ** 2 + (qe_l / qv) ** 2))
+        prop = (float(np.mean(rel)) * abs(float(Gl.mean()))
+                if rel else float("nan"))
+        scat = float(Gl.std())
+        err = max(scat, prop) if np.isfinite(prop) else scat
         print(f"M2 junction (dressing-subtracted shell-1 deficit per unit Q):"
-              f" {Gl.mean():.4f} ± {Gl.std():.4f}  across levels "
-              f"(constancy across the ladder = the lattice-G statement)")
+              f" {Gl.mean():.4f} ± {err:.4f}  across levels "
+              f"(scatter {scat:.4f}, propagated {prop:.4f}; "
+              f"constancy across the ladder = the lattice-G statement)")
     # T3/T4: profile-form and screening fits on the dressing-subtracted
     # deficit SHAPE (each level normalized to its own shell-1 deficit, then
     # pooled over levels > 0; second half of the measurements only)
     sw_all = sorted({int(r["sweep"]) for r in rows})
     lo = sw_all[len(sw_all) // 2]
-    late = defaultdict(list)
+    late_pin = defaultdict(list)             # (level, pin, shell) -> series
     for r in rows:
         if int(r["sweep"]) >= lo:
-            late[(int(r["level"]), int(r["shell"]))].append(
-                ref_of(r) - float(r["mean_f"]))
-    base = ({sh: float(np.mean(late[(0, sh)]))
-             for sh in shells if late.get((0, sh))} if 0 in levels else {})
+            late_pin[(int(r["level"]), int(r["pin_id"]),
+                      int(r["shell"]))].append(ref_of(r) - float(r["mean_f"]))
+
+    def late_ls(lvl, sh):
+        """(mean, sem) across pins of late-half per-pin mean deficits."""
+        ms = [float(np.mean(v)) for (l, p, s), v in late_pin.items()
+              if l == lvl and s == sh]
+        return combine_arms(ms)
+
+    base, base_e = {}, {}
+    if 0 in levels:
+        for sh in shells:
+            m, e = late_ls(0, sh)
+            if np.isfinite(m):
+                base[sh] = m
+                base_e[sh] = e if np.isfinite(e) else 0.0
     if base:
         print("level-0 dressing profile (deficit; negative = elevation): "
               + "  ".join(f"d={sh}: {v:+.4f}" for sh, v in sorted(base.items())))
     shape = {}
     for sh in shells:
-        vals = []
+        vals, errs = [], []
         for l in lv:
-            v, v1 = late.get((l, sh)), late.get((l, 1))
-            if v and v1:
-                dsh = float(np.mean(v)) - base.get(sh, 0.0)
-                d1 = float(np.mean(v1)) - base.get(1, 0.0)
-                if d1 > 1e-12:
-                    vals.append(dsh / d1)
+            m_sh, e_sh = late_ls(l, sh)
+            m_1, e_1 = late_ls(l, 1)
+            if not (np.isfinite(m_sh) and np.isfinite(m_1)):
+                continue
+            dsh = m_sh - base.get(sh, 0.0)
+            d1v = m_1 - base.get(1, 0.0)
+            if d1v > 1e-12:
+                vals.append(dsh / d1v)
+                e_sh = np.sqrt((e_sh if np.isfinite(e_sh) else 0.0) ** 2
+                               + base_e.get(sh, 0.0) ** 2)
+                e_1 = np.sqrt((e_1 if np.isfinite(e_1) else 0.0) ** 2
+                              + base_e.get(1, 0.0) ** 2)
+                errs.append(abs(dsh / d1v) * np.sqrt(
+                    (e_sh / dsh) ** 2 + (e_1 / d1v) ** 2)
+                    if abs(dsh) > 1e-12 else e_sh / d1v)
         if vals:
-            shape[sh] = (float(np.mean(vals)),
-                         float(np.std(vals) / max(1, len(vals)) ** 0.5))
+            scat = float(np.std(vals) / max(1, len(vals)) ** 0.5)
+            prop = float(np.sqrt(np.mean(np.square(errs)))
+                         / max(1, len(errs)) ** 0.5) if errs else 0.0
+            shape[sh] = (float(np.mean(vals)), max(scat, prop))
     print("\nT3/T4 deficit shape (dressing-subtracted, normalized to shell 1,"
-          " pooled over levels > 0, late half):")
+          " pooled over levels > 0, late half;\n  errors = max of across-level"
+          " scatter and propagated across-pin error):")
     for sh in sorted(shape):
         m, e = shape[sh]
         print(f"  d={sh}:  {m:+.4f} ± {e:.4f}")
-    pos = [(sh, m) for sh, (m, _) in sorted(shape.items()) if m > 0]
+    pos = [(sh, m, e) for sh, (m, e) in sorted(shape.items()) if m > 0]
     if len(pos) >= 3:
         x = np.array([p[0] for p in pos], float)
         y = np.array([p[1] for p in pos], float)
-        co, cov = np.polyfit(np.log(x), np.log(y), 1, cov=True)
+        ye = np.array([max(p[2], 1e-6) for p in pos], float)
+        # error-weighted fits: w = 1/sigma of the log-observable
+        wlog = y / ye                       # sigma(ln y) = ye/y
+        co, cov = np.polyfit(np.log(x), np.log(y), 1, w=wlog, cov=True)
         p1, perr = float(co[0]), float(cov[0][0]) ** 0.5
-        co2, cov2 = np.polyfit(x, np.log(y * x), 1, cov=True)
+        co2, cov2 = np.polyfit(x, np.log(y * x), 1, w=wlog, cov=True)
         s1, serr = float(co2[0]), float(cov2[0][0]) ** 0.5
         print(f"T3 profile form: deficit ~ d^({p1:.2f} ± {perr:.2f})   "
               f"(massless graph Green function on a 3-slice: ~ -1, with "
@@ -505,10 +583,11 @@ def analyze(prefix):
                   f" -- positive (closed-slice zero mode / far-field surplus "
                   f"dominating): inspect the shape table")
         print("  caveats: the closed-slice zero mode elevates the far field, "
-              "so negative-shape shells are excluded from the fits; quoted "
-              "errors ignore sweep autocorrelation (thin with "
-              "--measure-every if in doubt); usable range is capped by the "
-              "slice radius -- check n_cells per shell in the CSV.")
+              "so negative-shape shells are excluded from the fits; errors "
+              "are autocorrelation-corrected within pins (Sokal tau_int) "
+              "and use across-pin/level scatter above that; usable range is "
+              "capped by the slice radius -- check n_cells per shell in the "
+              "CSV.")
     else:
         print("T3/T4: fewer than 3 shells with positive deficit -- range too "
               "short to fit (larger slices / larger N41 needed).")
