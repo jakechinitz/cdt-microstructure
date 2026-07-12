@@ -218,34 +218,93 @@ CSV_FIELDS = ["sweep", "kind", "shell", "n_cells", "n_anchors", "mean_E",
               "coll", "mean_q", "shell_n"]
 
 
-def analyze(paths):
-    rows = []
+OBS_KEYS = ("mean_E", "coll", "mean_q", "shell_n")
+
+
+def _per_file_stats(paths):
+    """Per (file, kind, shell, key): sweep-ordered series -> IAT-corrected
+    (mean, sem, tau). Returns {(kind, shell, key): [(mean, sem, tau), ...]}
+    with one entry per file that carries the cell (files = seeds/arms)."""
+    from autocorr import mean_err
+    out = defaultdict(list)
     for p in paths:
-        rows += list(csv.DictReader(open(p)))
-    if not rows:
+        rows = sorted(csv.DictReader(open(p)), key=lambda r: int(r["sweep"]))
+        series = defaultdict(list)
+        for r in rows:
+            for key in OBS_KEYS:
+                series[(r["kind"], int(r["shell"]), key)].append(float(r[key]))
+        for cell, xs in series.items():
+            m, s, tau, _ = mean_err(xs)
+            out[cell].append((m, s, tau))
+    return out
+
+
+def analyze(paths):
+    """Errors are autocorrelation-corrected (Sokal tau_int, autocorr.py).
+    With one file per arm the quoted error is the IAT-corrected within-run
+    SEM; with several files (replication seeds) it is the ACROSS-SEED
+    scatter of per-seed means -- the runbook's quotable error."""
+    from autocorr import combine_arms
+    stats = _per_file_stats(paths)
+    if not stats:
         sys.exit("no rows")
-    agg = defaultdict(list)
-    for r in rows:
-        for key in ("mean_E", "coll", "mean_q", "shell_n"):
-            agg[(r["kind"], int(r["shell"]), key)].append(float(r[key]))
-    kinds = sorted({r["kind"] for r in rows})
-    shells = sorted({int(r["shell"]) for r in rows})
+    kinds = sorted({k for k, _, _ in stats})
+    shells = sorted({s for _, s, _ in stats})
+    nfiles = max(len(v) for v in stats.values())
+    err_mode = ("across-seed scatter where a cell appears in >1 file, else "
+                "IAT-corrected within-run SEM" if nfiles > 1
+                else "IAT-corrected within-run SEM")
+    print(f"# {len(paths)} file(s); errors = {err_mode}")
     print(f"{'kind':>10} {'shell':>5} " + "".join(
-        f"{k:>20}" for k in ("mean_E", "coll", "mean_q", "shell_n")))
+        f"{k:>22}" for k in OBS_KEYS) + f" {'max tau':>8}")
+    summary = {}
     for kind in kinds:
         for sh in shells:
-            cells = []
-            for key in ("mean_E", "coll", "mean_q", "shell_n"):
-                v = agg.get((kind, sh, key))
+            cells, taus = [], []
+            for key in OBS_KEYS:
+                v = stats.get((kind, sh, key))
                 if v:
-                    v = np.array(v)
-                    cells.append(f"{v.mean():>12.4f} ±{v.std()/max(1,len(v))**0.5:.4f}")
+                    taus += [t for _, _, t in v if np.isfinite(t)]
+                    if len(v) > 1:
+                        m, s = combine_arms([mm for mm, _, _ in v])
+                    else:
+                        m, s = v[0][0], v[0][1]
+                    summary[(kind, sh, key)] = (m, s)
+                    s_txt = f"±{s:.4f}" if np.isfinite(s) else "±  --"
+                    cells.append(f"{m:>13.4f} {s_txt}")
                 else:
-                    cells.append(f"{'--':>20}")
-            print(f"{kind:>10} {sh:>5} " + "".join(f"{c:>20}" for c in cells))
+                    cells.append(f"{'--':>22}")
+            tau_txt = f"{max(taus):>8.1f}" if taus else f"{'--':>8}"
+            print(f"{kind:>10} {sh:>5} " + "".join(f"{c:>22}" for c in cells)
+                  + tau_txt)
+    # real-minus-placebo separation: the pre-registered comparison. 'fail'
+    # is the defect arm, 'closed' the matched placebo.
+    if "fail" in kinds and "closed" in kinds:
+        print("\nSEPARATION real(fail) - placebo(closed)  "
+              "[z = |delta| / combined error]:")
+        print(f"{'shell':>5} " + "".join(f"{k:>22}" for k in OBS_KEYS))
+        for sh in shells:
+            cells = []
+            for key in OBS_KEYS:
+                a = summary.get(("fail", sh, key))
+                b = summary.get(("closed", sh, key))
+                if a and b and np.isfinite(a[1]) and np.isfinite(b[1]):
+                    d = a[0] - b[0]
+                    e = (a[1] ** 2 + b[1] ** 2) ** 0.5
+                    if e > 0:
+                        cells.append(f"{d:>+11.4f} ({abs(d) / e:>4.1f}s)")
+                    else:
+                        cells.append(f"{d:>+15.4f} (--)")
+                elif a and b:
+                    cells.append(f"{a[0] - b[0]:>+15.4f} (--)")
+                else:
+                    cells.append(f"{'--':>22}")
+            print(f"{sh:>5} " + "".join(f"{c:>22}" for c in cells))
     print("\nREAD: real vs placebo at each shell = the closure-failure effect"
           " (anchoring subtracted);\n      real vs virtual = total effect;"
-          " decay with shell = the strain profile.")
+          " decay with shell = the strain profile.\n      tau = integrated"
+          " autocorrelation time of the measurement series (sweeps between"
+          "\n      effectively independent samples / measure-every).")
 
 
 def main():

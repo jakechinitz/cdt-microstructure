@@ -50,12 +50,42 @@ def main():
                    help="enforce the CDT foliation (slices stay closed 3-manifolds; "
                         "standard AJL ensemble). --no-causal-slices reproduces the "
                         "pre-fix generalized ensemble.")
+    p.add_argument("--tune-k4", type=int, default=0, metavar="ROUNDS",
+                   help="auto-tune k4 to pseudo-criticality over N short "
+                        "bursts before the main run (phase_grid.py protocol: "
+                        "the eps-pin residual is the feedback error, "
+                        "k4 += 2*eps*(N41-target)). Fixed k4=0.9 was found "
+                        "to fight the pin across the grid; production runs "
+                        "at the tuned point should use --tune-k4 3.")
+    p.add_argument("--tune-burst", type=int, default=60,
+                   help="sweeps per tuning burst (after the first burst, "
+                        "which also grows to the target volume)")
     args = p.parse_args()
 
-    T = run("bare-Regge (verification)", k0=args.k0, Delta=args.Delta, k4=args.k4,
+    # --- optional k4 auto-tuning (pseudo-criticality via the pin residual) --
+    k4 = args.k4
+    resume = args.resume
+    if args.tune_k4 > 0:
+        for rd in range(1, args.tune_k4 + 1):
+            T = run(f"k4-tune round {rd}/{args.tune_k4}", k0=args.k0,
+                    Delta=args.Delta, k4=k4, target_N41=args.target_n41,
+                    K=args.K, eps=args.eps, seed=args.seed,
+                    max_sweeps=args.tune_burst, measure_every=args.tune_burst,
+                    checkpoint=args.checkpoint, resume=resume,
+                    causal=args.causal_slices, verbose=False)
+            resume = args.checkpoint
+            n41 = T.type_counts()[0]
+            dk = 2 * args.eps * (n41 - args.target_n41)
+            k4 += dk
+            print(f"# [k4-tune] round {rd}: N41={n41} (target "
+                  f"{args.target_n41})  pin residual => dk4={dk:+.4f}  "
+                  f"k4 -> {k4:.4f}", flush=True)
+        print(f"# [k4-tune] final k4 = {k4:.4f}", flush=True)
+
+    T = run("bare-Regge (verification)", k0=args.k0, Delta=args.Delta, k4=k4,
             target_N41=args.target_n41, K=args.K, eps=args.eps, seed=args.seed,
             max_sweeps=args.max_sweeps, measure_every=args.measure_every,
-            checkpoint=args.checkpoint, resume=args.resume,
+            checkpoint=args.checkpoint, resume=resume,
             causal=args.causal_slices,
             wall_budget_s=(args.wall_hours * 3600 if args.wall_hours else None))
 

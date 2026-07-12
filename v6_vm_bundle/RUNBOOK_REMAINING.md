@@ -1,5 +1,12 @@
 # Runbook: the remaining production runs
 
+> **2026-07-12 — the 100k scaling program supersedes items #1, #2 and the
+> volume-pair half of #4/#6 as a SINGLE LAUNCH:** see `PROGRAM_100K.md` /
+> `run_100k_program.py` (tuned phase point, autocorrelation-corrected
+> analyzers via `autocorr.py`, gated stages, resumable, final REPORT.md).
+> Items #3 (bridge family) and #6 (rung-2, after the ladder verdict)
+> remain separate passes by their own pre-registration discipline.
+
 Audited 2026-07-04 (code paths checked end-to-end; analyzers verified on
 synthetic data with known answers). All commands run from `v6_vm_bundle/`.
 `BASE` below = the clean fixed-engine bare checkpoint
